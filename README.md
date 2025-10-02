@@ -1,10 +1,42 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Inventory Manager
 
-# Getting Started
+A comprehensive inventory management application built with React Native and SQLite.
+
+## Features
+
+- **Product Management**: Add, edit, and delete products with detailed information
+- **Categorization**: Organize products by categories
+- **Price Management**: Track regular and discount prices
+- **Search & Filter**: Quickly find products with search and filtering options
+- **Responsive UI**: Modern, user-friendly interface that works on various device sizes
+- **Offline Storage**: All data stored locally using SQLite
+- **Drawer Navigation**: Easy access to all app features
+
+## Screens
+
+- **Dashboard**: Overview of all products with search and filter capabilities
+- **Add Item**: Form to add new products with validation
+- **Product Detail**: View and edit product information
+- **Settings**: Configure app preferences
+- **About**: Information about the application
+
+## Project Structure
+
+```
+src/
+├── components/       # Reusable UI components
+├── database/         # SQLite database configuration and services
+├── navigation/       # Navigation configuration
+├── screens/          # Application screens
+├── theme/            # UI theme definitions
+└── utils/            # Utility functions
+```
+
+## Getting Started
 
 > **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
 
-## Step 1: Start Metro
+### Step 1: Start Metro
 
 First, you will need to run **Metro**, the JavaScript build tool for React Native.
 
@@ -18,11 +50,11 @@ npm start
 yarn start
 ```
 
-## Step 2: Build and run your app
+### Step 2: Build and run your app
 
 With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
 
-### Android
+#### Android
 
 ```sh
 # Using npm
@@ -32,7 +64,7 @@ npm run android
 yarn android
 ```
 
-### iOS
+#### iOS
 
 For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
 
@@ -47,6 +79,23 @@ Then, and every time you update your native dependencies, run:
 ```sh
 bundle exec pod install
 ```
+
+## Build for Production
+
+### Android
+
+To build a release APK:
+
+```sh
+cd android
+./gradlew assembleRelease
+```
+
+The APK will be generated at `android/app/build/outputs/apk/release/app-release.apk`
+
+### iOS
+
+To build for iOS distribution, use Xcode to archive the application.
 
 For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
 
