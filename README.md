@@ -240,4 +240,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ for efficient inventory management**
+**Made with ❤️ by Amol Basavraj Solase**
