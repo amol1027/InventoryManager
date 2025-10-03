@@ -1,10 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getHeaderTitle } from '@react-navigation/elements';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../theme/ThemeContext';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ErrorHandler } from '../utils/ErrorHandler';
+import { ConfirmationDialog } from '../utils/ConfirmationDialog';
 
 // Import screens
 import DashboardScreen from '../screens/DashboardScreen';
@@ -38,6 +41,28 @@ export type RootStackParamList = {
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Enhanced error handling for navigation
+const handleNavigationError = (error: Error) => {
+  ErrorHandler.handle(error, 'Navigation', true);
+};
+
+// Enhanced drawer item press handler with error handling
+const handleDrawerItemPress = async (
+  navigation: any,
+  routeName: string,
+  params?: any
+) => {
+  try {
+    if (params) {
+      navigation.navigate(routeName as never, params as never);
+    } else {
+      navigation.navigate(routeName as never);
+    }
+  } catch (error) {
+    handleNavigationError(error as Error);
+  }
+};
 
 // Custom header component with menu button and centered title
 const CustomHeader = ({ navigation, route, options }: { navigation: any; route: any; options: any }) => {
@@ -79,33 +104,38 @@ const CustomHeader = ({ navigation, route, options }: { navigation: any; route: 
 
 const MainStack = () => {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        header: (props) => <CustomHeader {...props} />,
-      }}
-    >
-      <Stack.Screen 
-        name="Dashboard" 
-        component={DashboardScreen}
-        options={{ title: 'Dashboard' }}
-      />
-      <Stack.Screen 
-        name="AddItem" 
-        component={AddItemScreen}
-        options={{ 
-          title: 'Add Product',
-          headerShown: true,
+    <ErrorBoundary>
+      <Stack.Navigator
+        screenOptions={{
+          header: (props) => <CustomHeader {...props} />,
         }}
-      />
-      <Stack.Screen
-        name="ProductDetail"
-        component={ProductDetailScreen}
-        options={{ 
-          title: 'Product Details',
-          headerShown: true,
-        }}
-      />
-    </Stack.Navigator>
+      >
+        <Stack.Screen
+          name="Dashboard"
+          component={DashboardScreen}
+          options={{
+            title: 'Dashboard',
+            headerShown: true,
+          }}
+        />
+        <Stack.Screen
+          name="AddItem"
+          component={AddItemScreen}
+          options={{
+            title: 'Add Product',
+            headerShown: true,
+          }}
+        />
+        <Stack.Screen
+          name="ProductDetail"
+          component={ProductDetailScreen}
+          options={{
+            title: 'Product Details',
+            headerShown: true,
+          }}
+        />
+      </Stack.Navigator>
+    </ErrorBoundary>
   );
 };
 
@@ -127,63 +157,65 @@ const AppNavigator = () => {
   };
 
   return (
-    <Drawer.Navigator
-      initialRouteName="MainStack"
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
-      screenOptions={{
-        ...commonScreenOptions,
-        drawerActiveTintColor: colors.primary,
-        drawerInactiveTintColor: colors.text.secondary,
-        drawerStyle: {
-          backgroundColor: colors.background,
-          width: 280,
-        },
-        swipeEnabled: true,
-        swipeEdgeWidth: 100,
-      }}
-    >
-      <Drawer.Screen
-        name="MainStack"
-        component={MainStack}
-        options={{
-          drawerLabel: 'Home',
-          title: 'Dashboard',
-          headerShown: false,
+    <ErrorBoundary>
+      <Drawer.Navigator
+        initialRouteName="MainStack"
+        drawerContent={(props) => <CustomDrawerContent {...props} />}
+        screenOptions={{
+          ...commonScreenOptions,
+          drawerActiveTintColor: colors.primary,
+          drawerInactiveTintColor: colors.text.secondary,
+          drawerStyle: {
+            backgroundColor: colors.background,
+            width: 280,
+          },
+          swipeEnabled: true,
+          swipeEdgeWidth: 100,
         }}
-      />
-      <Drawer.Screen
-        name="Categories"
-        component={CategoriesScreen}
-        options={{
-          drawerLabel: 'Categories',
-          title: 'Categories',
-        }}
-      />
-      <Drawer.Screen
-        name="CategoryProducts"
-        component={CategoryProductsScreen}
-        options={{
-          drawerLabel: 'Category Products',
-          title: 'Products',
-        }}
-      />
-      <Drawer.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          drawerLabel: 'Theme',
-          title: 'Settings',
-        }}
-      />
-      <Drawer.Screen
-        name="About"
-        component={AboutScreen}
-        options={{
-          drawerLabel: 'About',
-          title: 'About',
-        }}
-      />
-    </Drawer.Navigator>
+      >
+        <Drawer.Screen
+          name="MainStack"
+          component={MainStack}
+          options={{
+            drawerLabel: 'Home',
+            title: 'Dashboard',
+            headerShown: false,
+          }}
+        />
+        <Drawer.Screen
+          name="Categories"
+          component={CategoriesScreen}
+          options={{
+            drawerLabel: 'Categories',
+            title: 'Categories',
+          }}
+        />
+        <Drawer.Screen
+          name="CategoryProducts"
+          component={CategoryProductsScreen}
+          options={{
+            drawerLabel: 'Category Products',
+            title: 'Products',
+          }}
+        />
+        <Drawer.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{
+            drawerLabel: 'Theme',
+            title: 'Settings',
+          }}
+        />
+        <Drawer.Screen
+          name="About"
+          component={AboutScreen}
+          options={{
+            drawerLabel: 'About',
+            title: 'About',
+          }}
+        />
+      </Drawer.Navigator>
+    </ErrorBoundary>
   );
 };
 
