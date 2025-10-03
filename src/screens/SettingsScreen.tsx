@@ -1,153 +1,159 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView } from 'react-native';
-import Header from '../components/Header';
-import { colors } from '../theme/colors';
+import React from 'react';
+import { View, Text, Switch } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../theme/ThemeContext';
 
 const SettingsScreen = () => {
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
-  const [autoBackup, setAutoBackup] = useState(false);
-  const [lowStockAlerts, setLowStockAlerts] = useState(true);
+  const { theme, colors, toggleTheme } = useTheme();
+  const isDarkMode = theme === 'dark';
+
+  const dynamicStyles = {
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold' as const,
+      color: colors.text.primary,
+      marginLeft: 12,
+    },
+    content: {
+      flex: 1,
+      padding: 20,
+    },
+    themeOption: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'space-between' as const,
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    themeInfo: {
+      flex: 1,
+      marginRight: 16,
+    },
+    themeTitle: {
+      fontSize: 18,
+      fontWeight: '600' as const,
+      color: colors.text.primary,
+      marginBottom: 4,
+    },
+    themeDescription: {
+      fontSize: 14,
+      color: colors.text.secondary,
+      lineHeight: 20,
+    },
+    currentTheme: {
+      marginBottom: 20,
+    },
+    currentThemeTitle: {
+      fontSize: 16,
+      fontWeight: '600' as const,
+      color: colors.text.primary,
+      marginBottom: 12,
+    },
+    themePreview: {
+      padding: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center' as const,
+    },
+    themePreviewDark: {
+      padding: 16,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center' as const,
+      backgroundColor: '#1a1a1a',
+    },
+    themePreviewText: {
+      fontSize: 16,
+      fontWeight: '500' as const,
+    },
+    themePreviewTextDark: {
+      fontSize: 16,
+      fontWeight: '500' as const,
+      color: '#ffffff',
+    },
+    note: {
+      flexDirection: 'row' as const,
+      alignItems: 'flex-start' as const,
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    noteText: {
+      fontSize: 14,
+      color: colors.text.secondary,
+      marginLeft: 8,
+      lineHeight: 20,
+    },
+  };
 
   return (
-    <View style={styles.container}>
-      <Header title="Settings" />
-      <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Dark Mode</Text>
-              <Text style={styles.settingDescription}>
-                Enable dark theme for the application
-              </Text>
-            </View>
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={darkMode ? colors.secondary : '#f4f3f4'}
-            />
+    <View style={dynamicStyles.container}>
+      <View style={dynamicStyles.header}>
+        <Icon name="brightness-6" size={28} color={colors.primary} />
+        <Text style={dynamicStyles.title}>Theme Settings</Text>
+      </View>
+
+      <View style={dynamicStyles.content}>
+        <View style={dynamicStyles.themeOption}>
+          <View style={dynamicStyles.themeInfo}>
+            <Text style={dynamicStyles.themeTitle}>
+              {isDarkMode ? 'Dark Mode' : 'Light Mode'}
+            </Text>
+            <Text style={dynamicStyles.themeDescription}>
+              {isDarkMode
+                ? 'Dark theme for comfortable viewing in low light'
+                : 'Light theme for bright environments'
+              }
+            </Text>
+          </View>
+          <Switch
+            value={isDarkMode}
+            onValueChange={toggleTheme}
+            trackColor={{
+              false: colors.border,
+              true: colors.primary
+            }}
+            thumbColor={isDarkMode ? colors.secondary : '#f4f3f4'}
+          />
+        </View>
+
+        <View style={dynamicStyles.currentTheme}>
+          <Text style={dynamicStyles.currentThemeTitle}>Current Theme</Text>
+          <View style={isDarkMode ? dynamicStyles.themePreviewDark : dynamicStyles.themePreview}>
+            <Text style={isDarkMode ? dynamicStyles.themePreviewTextDark : dynamicStyles.themePreviewText}>
+              {isDarkMode ? 'Dark Mode Active' : 'Light Mode Active'}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Enable Notifications</Text>
-              <Text style={styles.settingDescription}>
-                Receive notifications about inventory updates
-              </Text>
-            </View>
-            <Switch
-              value={notifications}
-              onValueChange={setNotifications}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={notifications ? colors.secondary : '#f4f3f4'}
-            />
-          </View>
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Low Stock Alerts</Text>
-              <Text style={styles.settingDescription}>
-                Get notified when products are running low
-              </Text>
-            </View>
-            <Switch
-              value={lowStockAlerts}
-              onValueChange={setLowStockAlerts}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={lowStockAlerts ? colors.secondary : '#f4f3f4'}
-            />
-          </View>
+        <View style={dynamicStyles.note}>
+          <Icon name="info" size={20} color={colors.text.secondary} />
+          <Text style={dynamicStyles.noteText}>
+            Theme changes are applied immediately across the entire app.
+          </Text>
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Management</Text>
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Automatic Backup</Text>
-              <Text style={styles.settingDescription}>
-                Automatically backup your inventory data
-              </Text>
-            </View>
-            <Switch
-              value={autoBackup}
-              onValueChange={setAutoBackup}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={autoBackup ? colors.secondary : '#f4f3f4'}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Version</Text>
-            <Text style={styles.infoValue}>1.0.0</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Build</Text>
-            <Text style={styles.infoValue}>2023.1</Text>
-          </View>
-        </View>
-      </ScrollView>
+      </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 16,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  settingTitle: {
-    fontSize: 16,
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  settingDescription: {
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  infoLabel: {
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  infoValue: {
-    fontSize: 16,
-    color: colors.text.secondary,
-  },
-});
 
 export default SettingsScreen;

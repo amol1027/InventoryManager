@@ -1,6 +1,10 @@
 import React from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { getHeaderTitle } from '@react-navigation/elements';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useTheme } from '../theme/ThemeContext';
 
 // Import screens
 import DashboardScreen from '../screens/DashboardScreen';
@@ -8,79 +12,176 @@ import AddItemScreen from '../screens/AddItemScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
+import CategoriesScreen from '../screens/CategoriesScreen';
+import CategoryProductsScreen from '../screens/CategoryProductsScreen';
 
 // Import theme
 import { colors } from '../theme/colors';
 
+// Import custom drawer content
+import CustomDrawerContent from './CustomDrawerContent';
+
 // Define navigation types
-export type RootStackParamList = {
-  Dashboard: undefined;
-  AddItem: undefined;
-  ProductDetail: { productId: number };
+export type RootDrawerParamList = {
+  MainStack: undefined;
+  Categories: undefined;
+  CategoryProducts: { categoryName: string };
   Settings: undefined;
   About: undefined;
 };
 
-const Drawer = createDrawerNavigator<RootStackParamList>();
+export type RootStackParamList = {
+  Dashboard: undefined;
+  AddItem: undefined;
+  ProductDetail: { productId: number };
+};
+
+const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Custom header component with menu button and centered title
+const CustomHeader = ({ navigation, route, options }: { navigation: any; route: any; options: any }) => {
+  const title = getHeaderTitle(options, route.name);
+  
+  return (
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      paddingHorizontal: 16,
+      height: 56,
+    }}>
+      <TouchableOpacity 
+        onPress={navigation.toggleDrawer} 
+        style={{
+          position: 'absolute',
+          left: 16,
+          zIndex: 1,
+        }}
+      >
+        <Icon name="menu" size={24} color={colors.text.inverse} />
+      </TouchableOpacity>
+      <View style={{
+        flex: 1,
+        alignItems: 'center',
+      }}>
+        <Text style={{
+          color: colors.text.inverse,
+          fontSize: 20,
+          fontWeight: 'bold',
+        }}>
+          {title}
+        </Text>
+      </View>
+    </View>
+  );
+};
 
 const MainStack = () => {
   return (
     <Stack.Navigator
-      initialRouteName="Dashboard"
       screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.primary,
-        },
-        headerTintColor: colors.text.inverse,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        header: (props) => <CustomHeader {...props} />,
       }}
     >
       <Stack.Screen 
         name="Dashboard" 
-        component={DashboardScreen} 
-        options={{ title: 'Inventory Dashboard' }} 
+        component={DashboardScreen}
+        options={{ title: 'Dashboard' }}
       />
       <Stack.Screen 
         name="AddItem" 
-        component={AddItemScreen} 
-        options={{ title: 'Add New Product' }} 
+        component={AddItemScreen}
+        options={{ 
+          title: 'Add Product',
+          headerShown: true,
+        }}
       />
-      <Stack.Screen 
-        name="ProductDetail" 
-        component={ProductDetailScreen} 
-        options={{ title: 'Product Details' }} 
+      <Stack.Screen
+        name="ProductDetail"
+        component={ProductDetailScreen}
+        options={{ 
+          title: 'Product Details',
+          headerShown: true,
+        }}
       />
     </Stack.Navigator>
   );
 };
 
 const AppNavigator = () => {
+  const { colors } = useTheme();
+  const commonScreenOptions = {
+    header: (props: any) => <CustomHeader {...props} />,
+    headerShown: true,
+    headerStyle: {
+      backgroundColor: colors.primary,
+      elevation: 0,
+      shadowOpacity: 0,
+    },
+    headerTintColor: colors.text.inverse,
+    headerTitleStyle: {
+      fontWeight: 'bold' as const,
+    },
+    headerLeft: () => null, // Hide default back button
+  };
+
   return (
     <Drawer.Navigator
-      initialRouteName="Dashboard"
+      initialRouteName="MainStack"
+      drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
-        headerShown: false,
+        ...commonScreenOptions,
         drawerActiveTintColor: colors.primary,
         drawerInactiveTintColor: colors.text.secondary,
+        drawerStyle: {
+          backgroundColor: colors.background,
+          width: 280,
+        },
+        swipeEnabled: true,
+        swipeEdgeWidth: 100,
       }}
     >
-      <Drawer.Screen 
-        name="Dashboard" 
-        component={MainStack} 
-        options={{ drawerLabel: 'Dashboard' }} 
+      <Drawer.Screen
+        name="MainStack"
+        component={MainStack}
+        options={{
+          drawerLabel: 'Home',
+          title: 'Dashboard',
+          headerShown: false,
+        }}
       />
-      <Drawer.Screen 
-        name="Settings" 
-        component={SettingsScreen} 
-        options={{ drawerLabel: 'Settings', headerShown: true }} 
+      <Drawer.Screen
+        name="Categories"
+        component={CategoriesScreen}
+        options={{
+          drawerLabel: 'Categories',
+          title: 'Categories',
+        }}
       />
-      <Drawer.Screen 
-        name="About" 
-        component={AboutScreen} 
-        options={{ drawerLabel: 'About', headerShown: true }} 
+      <Drawer.Screen
+        name="CategoryProducts"
+        component={CategoryProductsScreen}
+        options={{
+          drawerLabel: 'Category Products',
+          title: 'Products',
+        }}
+      />
+      <Drawer.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          drawerLabel: 'Theme',
+          title: 'Settings',
+        }}
+      />
+      <Drawer.Screen
+        name="About"
+        component={AboutScreen}
+        options={{
+          drawerLabel: 'About',
+          title: 'About',
+        }}
       />
     </Drawer.Navigator>
   );

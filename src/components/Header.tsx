@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface HeaderProps {
   title: string;
@@ -18,9 +18,34 @@ const Header: React.FC<HeaderProps> = ({
   rightComponent,
 }) => {
   const navigation = useNavigation();
+  const { colors } = useTheme();
+
+  const dynamicStyles = {
+    container: {
+      height: 56,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingHorizontal: 8,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    title: {
+      flex: 1,
+      fontSize: 20,
+      fontWeight: 'bold' as const,
+      color: colors.text.primary,
+      textAlign: 'center' as const,
+    },
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       <View style={styles.leftContainer}>
         {showBackButton && (
           <TouchableOpacity
@@ -40,7 +65,7 @@ const Header: React.FC<HeaderProps> = ({
         )}
       </View>
 
-      <Text style={styles.title} numberOfLines={1}>
+      <Text style={dynamicStyles.title} numberOfLines={1}>
         {title}
       </Text>
 
@@ -52,15 +77,6 @@ const Header: React.FC<HeaderProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: 8,
-  },
   leftContainer: {
     width: 48,
     justifyContent: 'center',
@@ -71,15 +87,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    textAlign: 'center',
-  },
   iconButton: {
     padding: 8,
+    borderRadius: 8,
   },
   placeholder: {
     width: 24,

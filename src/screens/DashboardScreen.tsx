@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import {
   View,
   Text,
@@ -11,272 +12,22 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-import { RootStackParamList } from '../navigation/AppNavigator';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import DatabaseService, { Product } from '../database/DatabaseService';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 type DashboardScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Dashboard'>;
-
 type SortOption = 'category' | 'nameAsc' | 'nameDesc' | 'priceAsc' | 'priceDesc' | 'discount';
 
-const DashboardScreen = () => {
-  const navigation = useNavigation<DashboardScreenNavigationProp>();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sortOption, setSortOption] = useState<SortOption>('nameAsc');
-  const [showSortOptions, setShowSortOptions] = useState(false);
+// Extend the Product interface to include missing properties
+interface ExtendedProduct extends Product {
+  description?: string;
+  image?: string;
+}
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadProducts();
-    }, [])
-  );
-
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      await DatabaseService.initDatabase();
-      const allProducts = await DatabaseService.getAllProducts();
-      setProducts(allProducts);
-      setFilteredProducts(allProducts);
-      sortProducts(allProducts, sortOption);
-    } catch (error) {
-      console.error('Error loading products:', error);
-      Alert.alert('Error', 'Failed to load products');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim() === '') {
-      setFilteredProducts(products);
-    } else {
-      const filtered = products.filter(
-        (product) =>
-          product.name.toLowerCase().includes(query.toLowerCase()) ||
-          product.category.toLowerCase().includes(query.toLowerCase()) ||
-          (product.details && product.details.toLowerCase().includes(query.toLowerCase()))
-      );
-      setFilteredProducts(filtered);
-    }
-  };
-
-  const sortProducts = (productsToSort: Product[], option: SortOption) => {
-    let sorted = [...productsToSort];
-    
-    switch (option) {
-      case 'category':
-        sorted.sort((a, b) => a.category.localeCompare(b.category));
-        break;
-      case 'nameAsc':
-        sorted.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'nameDesc':
-        sorted.sort((a, b) => b.name.localeCompare(a.name));
-        break;
-      case 'priceAsc':
-        sorted.sort((a, b) => a.price - b.price);
-        break;
-      case 'priceDesc':
-        sorted.sort((a, b) => b.price - a.price);
-        break;
-      case 'discount':
-        sorted.sort((a, b) => {
-          const discountA = a.discountPrice ? ((a.price - a.discountPrice) / a.price) * 100 : 0;
-          const discountB = b.discountPrice ? ((b.price - b.discountPrice) / b.price) * 100 : 0;
-          return discountB - discountA;
-        });
-        break;
-      default:
-        break;
-    }
-    
-    setFilteredProducts(sorted);
-    setSortOption(option);
-  };
-
-  const handleSortChange = (option: SortOption) => {
-    sortProducts(filteredProducts, option);
-    setShowSortOptions(false);
-  };
-
-  const renderSortOptions = () => {
-    if (!showSortOptions) return null;
-    
-    return (
-      <View style={styles.sortOptionsContainer}>
-        <TouchableOpacity
-          style={styles.sortOption}
-          onPress={() => handleSortChange('category')}
-        >
-          <Text style={sortOption === 'category' ? styles.selectedSortText : styles.sortText}>
-            By Category
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sortOption}
-          onPress={() => handleSortChange('nameAsc')}
-        >
-          <Text style={sortOption === 'nameAsc' ? styles.selectedSortText : styles.sortText}>
-            Name (A-Z)
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sortOption}
-          onPress={() => handleSortChange('nameDesc')}
-        >
-          <Text style={sortOption === 'nameDesc' ? styles.selectedSortText : styles.sortText}>
-            Name (Z-A)
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sortOption}
-          onPress={() => handleSortChange('priceAsc')}
-        >
-          <Text style={sortOption === 'priceAsc' ? styles.selectedSortText : styles.sortText}>
-            Price (Low-High)
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sortOption}
-          onPress={() => handleSortChange('priceDesc')}
-        >
-          <Text style={sortOption === 'priceDesc' ? styles.selectedSortText : styles.sortText}>
-            Price (High-Low)
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.sortOption}
-          onPress={() => handleSortChange('discount')}
-        >
-          <Text style={sortOption === 'discount' ? styles.selectedSortText : styles.sortText}>
-            Discount %
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderItem = ({ item }: { item: Product }) => {
-    const discountPercentage = item.discountPrice
-      ? Math.round(((item.price - item.discountPrice) / item.price) * 100)
-      : 0;
-
-    return (
-      <TouchableOpacity
-        style={styles.productCard}
-        onPress={() => navigation.navigate('ProductDetail', { productId: item.id || 0 })}
-      >
-        {item.imageUri && (
-          <Image
-            source={{ uri: item.imageUri }}
-            style={styles.productImage}
-          />
-        )}
-        <View style={styles.productInfo}>
-          <Text style={styles.productName}>{item.name}</Text>
-          <View style={styles.productMeta}>
-            <Text style={styles.productCategory}>{item.category}</Text>
-            {item.gstSlab && item.gstSlab > 0 && (
-              <View style={styles.gstBadge}>
-                <Text style={styles.gstText}>{item.gstSlab}% GST</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.inventoryInfo}>
-            <Text style={styles.quantityText}>Qty: {item.quantity || 0}</Text>
-            {item.quantity !== undefined && item.quantity > 0 && (
-              <View style={[styles.stockBadge, item.quantity > 10 ? styles.inStock : styles.lowStock]}>
-                <Text style={styles.stockText}>
-                  {item.quantity > 10 ? 'In Stock' : item.quantity > 0 ? 'Low Stock' : 'Out of Stock'}
-                </Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.priceContainer}>
-            {item.discountPrice ? (
-              <>
-                <Text style={styles.originalPrice}>${item.price.toFixed(2)}</Text>
-                <Text style={styles.discountPrice}>${item.discountPrice.toFixed(2)}</Text>
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
-                </View>
-              </>
-            ) : (
-              <Text style={styles.price}>${item.price.toFixed(2)}</Text>
-            )}
-          </View>
-        </View>
-        <Icon name="chevron-right" size={24} color={colors.text.secondary} />
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Icon name="search" size={24} color={colors.text.secondary} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search products..."
-            value={searchQuery}
-            onChangeText={handleSearch}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => handleSearch('')}>
-              <Icon name="close" size={24} color={colors.text.secondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={styles.sortButton}
-          onPress={() => setShowSortOptions(!showSortOptions)}
-        >
-          <Icon name="sort" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      </View>
-
-      {renderSortOptions()}
-
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
-      ) : filteredProducts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Icon name="inventory" size={64} color={colors.text.disabled} />
-          <Text style={styles.emptyText}>No products found</Text>
-          <Text style={styles.emptySubText}>
-            {searchQuery ? 'Try a different search term' : 'Add your first product'}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredProducts}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-          contentContainerStyle={styles.listContainer}
-        />
-      )}
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('AddItem')}
-      >
-        <Icon name="add" size={24} color={colors.text.inverse} />
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -288,163 +39,83 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  searchInputContainer: {
+  searchInput: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: colors.background,
     borderRadius: 8,
     paddingHorizontal: 12,
+    paddingVertical: 8,
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
     color: colors.text.primary,
   },
   sortButton: {
-    backgroundColor: colors.primary,
-    width: 40,
-    height: 40,
+    padding: 8,
     borderRadius: 8,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  sortOptionsContainer: {
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    padding: 8,
-  },
-  sortOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  sortText: {
-    color: colors.text.primary,
-  },
-  selectedSortText: {
-    color: colors.primary,
-    fontWeight: 'bold',
   },
   listContainer: {
     padding: 16,
   },
-  productCard: {
+  productItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: colors.surface,
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   productImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 4,
-    marginRight: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
   },
   productInfo: {
     flex: 1,
   },
   productName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
     color: colors.text.primary,
     marginBottom: 4,
   },
   productCategory: {
     fontSize: 14,
     color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  productMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  gstBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  gstText: {
-    color: colors.text.inverse,
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  inventoryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  quantityText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginRight: 12,
-  },
-  stockBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  inStock: {
-    backgroundColor: colors.success,
-  },
-  lowStock: {
-    backgroundColor: colors.warning,
-  },
-  stockText: {
-    color: colors.text.inverse,
-    fontSize: 12,
-    fontWeight: '500',
+    marginBottom: 4,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   price: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: colors.primary,
   },
   originalPrice: {
     fontSize: 14,
-    color: colors.text.secondary,
     textDecorationLine: 'line-through',
-    marginRight: 8,
-  },
-  discountPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.accent,
+    color: colors.text.secondary,
     marginRight: 8,
   },
   discountBadge: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.error,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+    marginLeft: 8,
   },
   discountText: {
     color: colors.text.inverse,
     fontSize: 12,
     fontWeight: 'bold',
   },
-  loader: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -453,36 +124,272 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+    fontSize: 16,
+    color: colors.text.secondary,
+    textAlign: 'center',
     marginTop: 16,
   },
-  emptySubText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  fab: {
+  sortOptionsContainer: {
     position: 'absolute',
+    top: 60,
     right: 16,
-    bottom: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 8,
+    zIndex: 1000,
     elevation: 4,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
   },
+  sortOption: {
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sortOptionText: {
+    marginLeft: 8,
+    color: colors.text.primary,
+  },
+  sortOptionSelected: {
+    backgroundColor: `${colors.primary}20`,
+  },
+  sortOptionSelectedText: {
+    color: colors.primary,
+    fontWeight: 'bold',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+  },
 });
+
+const DashboardScreen = () => {
+  const navigation = useNavigation<DashboardScreenNavigationProp>();
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState<ExtendedProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortOption, setSortOption] = useState<SortOption>('nameAsc');
+  const [showSortOptions, setShowSortOptions] = useState(false);
+
+  const loadProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const allProducts = await DatabaseService.getAllProducts();
+      let sortedProducts = [...allProducts];
+
+      switch (sortOption) {
+        case 'nameAsc':
+          sortedProducts.sort((a, b) => a.name.localeCompare(b.name));
+          break;
+        case 'nameDesc':
+          sortedProducts.sort((a, b) => b.name.localeCompare(a.name));
+          break;
+        case 'priceAsc':
+          sortedProducts.sort((a, b) => (a.price || 0) - (b.price || 0));
+          break;
+        case 'priceDesc':
+          sortedProducts.sort((a, b) => (b.price || 0) - (a.price || 0));
+          break;
+        case 'discount':
+          sortedProducts = sortedProducts.filter(p => p.discountPrice && p.discountPrice < p.price);
+          break;
+        case 'category':
+          sortedProducts.sort((a, b) => a.category.localeCompare(b.category));
+          break;
+      }
+
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        sortedProducts = sortedProducts.filter(
+          p =>
+            p.name.toLowerCase().includes(query) ||
+            (p.details || '').toLowerCase().includes(query) ||
+            p.category.toLowerCase().includes(query)
+        );
+      }
+
+      setProducts(sortedProducts);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      Alert.alert('Error', 'Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, sortOption]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProducts();
+    }, [loadProducts])
+  );
+
+  const handleAddPress = () => {
+    navigation.navigate('AddItem');
+  };
+
+  const handleProductPress = (product: ExtendedProduct) => {
+    if (product.id) {
+      navigation.navigate('ProductDetail', { productId: product.id });
+    } else {
+      Alert.alert('Error', 'Product ID is missing');
+    }
+  };
+
+  const renderProductItem = ({ item }: { item: ExtendedProduct }) => {
+    // Calculate discount percentage if discount price exists
+    const discountPercentage = item.discountPrice
+      ? Math.round(((item.price - item.discountPrice) / item.price) * 100)
+      : 0;
+    const hasDiscount = item.discountPrice && item.discountPrice < item.price;
+
+    return (
+      <TouchableOpacity
+        style={styles.productItem}
+        onPress={() => handleProductPress(item)}
+      >
+        {item.imageUri ? (
+          <Image
+            source={{ uri: item.imageUri }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.productImage, { backgroundColor: colors.background }]}>
+            <Icon name="image" size={30} color={colors.text.secondary} />
+          </View>
+        )}
+        <View style={styles.productInfo}>
+          <Text style={styles.productName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.productCategory} numberOfLines={1}>
+            {item.category}
+          </Text>
+          <View style={styles.priceContainer}>
+            {hasDiscount ? (
+              <>
+                <Text style={styles.originalPrice}>₹{item.price?.toFixed(2)}</Text>
+                <Text style={styles.price}>₹{item.discountPrice?.toFixed(2)}</Text>
+                <View style={styles.discountBadge}>
+                  <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.price}>₹{item.price?.toFixed(2)}</Text>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderEmptyComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Icon name="inventory" size={64} color={colors.text.secondary} />
+      <Text style={styles.emptyText}>
+        {searchQuery
+          ? 'No products found matching your search.'
+          : 'No products added yet. Tap + to add your first item.'}
+      </Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search products..."
+          placeholderTextColor={colors.text.secondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        <TouchableOpacity
+          style={styles.sortButton}
+          onPress={() => setShowSortOptions(!showSortOptions)}
+        >
+          <Icon name="sort" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {showSortOptions && (
+        <View style={styles.sortOptionsContainer}>
+          {[
+            { value: 'nameAsc', label: 'Name (A-Z)', icon: 'sort-alphabetical-ascending' },
+            { value: 'nameDesc', label: 'Name (Z-A)', icon: 'sort-alphabetical-descending' },
+            { value: 'priceAsc', label: 'Price (Low to High)', icon: 'sort-numeric-ascending' },
+            { value: 'priceDesc', label: 'Price (High to Low)', icon: 'sort-numeric-descending' },
+            { value: 'discount', label: 'On Sale', icon: 'sale' },
+            { value: 'category', label: 'Category', icon: 'category' },
+          ].map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={[
+                styles.sortOption,
+                sortOption === option.value && styles.sortOptionSelected,
+              ]}
+              onPress={() => {
+                setSortOption(option.value as SortOption);
+                setShowSortOptions(false);
+              }}
+            >
+              <Icon
+                name={option.icon as any}
+                size={20}
+                color={sortOption === option.value ? colors.primary : colors.text.primary}
+              />
+              <Text
+                style={[
+                  styles.sortOptionText,
+                  sortOption === option.value && styles.sortOptionSelectedText,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={products}
+          renderItem={renderProductItem}
+          keyExtractor={(item) => item.id?.toString() || `product-${item.name}-${item.price}`}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={renderEmptyComponent}
+        />
+      )}
+
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        onPress={handleAddPress}
+      >
+        <Icon name="add" size={30} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 export default DashboardScreen;

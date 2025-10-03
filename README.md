@@ -1,6 +1,6 @@
 # Inventory Manager
 
-A comprehensive inventory management application built with React Native and SQLite for efficient business inventory tracking.
+A comprehensive inventory management application built with React Native and SQLite for efficient business inventory tracking. Features include GST compliance, quantity management, image support, and a professional drawer navigation system for seamless app navigation.
 
 ## 🚀 Features
 
@@ -21,21 +21,26 @@ A comprehensive inventory management application built with React Native and SQL
 - **Image Support**: Add product images from camera or gallery
 - **Detailed Product Information**: Store specifications, descriptions, and metadata
 - **Date Tracking**: Creation and last updated timestamps with proper formatting
+- **Drawer Navigation**: Professional slide-out menu for easy app navigation
+- **Theme Support**: Dark/light theme toggle for user preference
+- **Category Management**: Dedicated screen for viewing and managing product categories
 
 ### User Interface
 - **Modern Design**: Clean, professional interface with intuitive navigation
 - **Responsive Layout**: Optimized for various device sizes and orientations
-- **Drawer Navigation**: Easy access to all app features
+- **Drawer Navigation**: Easy access to all app features via slide-out menu
 - **Real-time Validation**: Form validation with helpful error messages
 - **Visual Feedback**: Loading states, success messages, and error handling
+- **Interactive Elements**: Touch-friendly buttons, cards, and navigation
 
 ## 📱 Screens
 
 - **Dashboard**: Overview of all products with search, filter, and stock status
 - **Add Item**: Comprehensive form to add new products with validation
-- **Product Detail**: View and edit complete product information
-- **Settings**: Configure app preferences and options
-- **About**: Information about the application
+- **Product Detail**: View and edit complete product information with GST and quantity management
+- **Categories**: Dedicated screen for viewing and managing product categories with product counts
+- **Theme Settings**: Dark/light theme toggle with live preview and customization options
+- **About**: Comprehensive app information including version, developer details, and feature overview
 
 ## 🏗️ Project Structure
 
@@ -43,8 +48,8 @@ A comprehensive inventory management application built with React Native and SQL
 src/
 ├── components/       # Reusable UI components
 ├── database/         # SQLite database configuration and services
-├── navigation/       # Navigation configuration
-├── screens/          # Application screens
+├── navigation/       # Navigation configuration (AppNavigator, CustomDrawerContent)
+├── screens/          # Application screens (Dashboard, AddItem, ProductDetail, etc.)
 ├── theme/            # UI theme definitions (colors, styles)
 └── utils/            # Utility functions
 ```
@@ -54,7 +59,7 @@ src/
 - **React Native 0.81.4**: Cross-platform mobile development
 - **TypeScript**: Type-safe JavaScript development
 - **SQLite**: Local database for offline storage
-- **React Navigation**: Navigation between screens
+- **React Navigation**: Navigation between screens with drawer support
 - **React Native Vector Icons**: Icon library for UI elements
 - **React Native Image Picker**: Camera and gallery image selection
 - **React Native Reanimated**: Smooth animations and transitions
@@ -167,8 +172,9 @@ CREATE TABLE products (
 ### Search & Navigation
 - **Real-time Search**: Instant search across product names, categories, and descriptions
 - **Category Filtering**: Filter products by category
-- **Intuitive Navigation**: Drawer-based navigation for easy access
+- **Intuitive Navigation**: Drawer-based navigation for easy access to all features
 - **Quick Actions**: Fast access to add new items and view details
+- **Professional Drawer Menu**: Slide-out navigation with Home, Theme, Categories, About, and Exit options
 
 ## 🎨 UI/UX Features
 

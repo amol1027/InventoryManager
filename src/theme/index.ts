@@ -1,4 +1,5 @@
-import colors from './colors';
+import colors, { darkColors } from './colors';
+import { ThemeProvider, useTheme } from './ThemeContext';
 
 export const theme = {
   colors,
@@ -37,4 +38,5 @@ export const theme = {
   },
 };
 
+export { ThemeProvider, useTheme, darkColors };
 export default theme;

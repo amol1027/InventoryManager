@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,27 +16,18 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 
 import DatabaseService from '../database/DatabaseService';
-import { colors } from '../theme/colors';
-
-const CATEGORIES = [
-  'Electronics',
-  'Clothing',
-  'Home & Kitchen',
-  'Books',
-  'Toys & Games',
-  'Beauty & Personal Care',
-  'Sports & Outdoors',
-  'Automotive',
-  'Office supplies',
-  'Other',
-];
+import { useTheme } from '../theme/ThemeContext';
 
 const GST_SLABS = [0, 5, 12, 18, 28];
 
 const AddItemScreen = () => {
   const navigation = useNavigation();
+  const { colors } = useTheme();
+  const styles = getStyles(colors);
   const [name, setName] = useState('');
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [category, setCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [discountPrice, setDiscountPrice] = useState('');
@@ -49,6 +40,39 @@ const AddItemScreen = () => {
     price: '',
     discountPrice: '',
   });
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        await DatabaseService.initDatabase();
+        const allProducts = await DatabaseService.getAllProducts();
+
+        // Extract unique categories from products
+        const uniqueCategories = [...new Set(allProducts.map(product => product.category))];
+
+        // Sort categories alphabetically
+        uniqueCategories.sort();
+
+        setCategories(uniqueCategories);
+
+        // Set default category if categories exist
+        if (uniqueCategories.length > 0) {
+          setCategory(uniqueCategories[0]);
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        Alert.alert('Error', 'Failed to load categories');
+        // Fallback to basic categories if database fails
+        setCategories(['Electronics', 'Clothing', 'Home & Kitchen', 'Books', 'Other']);
+        setCategory('Electronics');
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const validateForm = () => {
     let isValid = true;
@@ -80,7 +104,7 @@ const AddItemScreen = () => {
     if (!quantity.trim()) {
       // Quantity is optional, but if provided, validate it
     } else {
-      const quantityValue = parseInt(quantity);
+      const quantityValue = parseInt(quantity, 10);
       if (isNaN(quantityValue) || quantityValue < 0) {
         // For now, we'll allow 0 or positive quantities
         // You can add more specific validation if needed
@@ -158,8 +182,8 @@ const AddItemScreen = () => {
         name,
         category,
         price: parseFloat(price),
-        quantity: quantity ? parseInt(quantity) : 0,
-        discountPrice: discountPrice ? parseFloat(discountPrice) : undefined,
+        quantity: quantity && quantity.trim() ? parseInt(quantity, 10) : 0,
+        discountPrice: discountPrice && discountPrice.trim() ? parseFloat(discountPrice) : undefined,
         gstSlab,
         details: details.trim() || undefined,
         imageUri,
@@ -194,18 +218,24 @@ const AddItemScreen = () => {
 
         <Text style={styles.label}>Category *</Text>
         <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={category}
-            onValueChange={(itemValue) => setCategory(itemValue)}
-            style={styles.picker}
-          >
-            {CATEGORIES.map((cat) => (
-              <Picker.Item key={cat} label={cat} value={cat} />
-            ))}
-          </Picker>
+          {loadingCategories ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading categories...</Text>
+            </View>
+          ) : (
+            <Picker
+              selectedValue={category}
+              onValueChange={(itemValue) => setCategory(itemValue)}
+              style={styles.picker}
+            >
+              {categories.map((cat) => (
+                <Picker.Item key={cat} label={cat} value={cat} />
+              ))}
+            </Picker>
+          )}
         </View>
 
-        <Text style={styles.label}>Price ($) *</Text>
+        <Text style={styles.label}>Price (₹) *</Text>
         <TextInput
           style={[styles.input, errors.price ? styles.inputError : null]}
           value={price}
@@ -224,7 +254,7 @@ const AddItemScreen = () => {
           keyboardType="number-pad"
         />
 
-        <Text style={styles.label}>Discount Price ($)</Text>
+        <Text style={styles.label}>Discount Price (₹)</Text>
         <TextInput
           style={[styles.input, errors.discountPrice ? styles.inputError : null]}
           value={discountPrice}
@@ -294,7 +324,7 @@ const AddItemScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -310,7 +340,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   input: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
@@ -375,6 +405,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  loadingContainer: {
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: colors.text.secondary,
+    fontSize: 16,
   },
 });
 
