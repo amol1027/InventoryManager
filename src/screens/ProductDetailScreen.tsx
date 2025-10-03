@@ -16,25 +16,415 @@ import {
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
-
-import { RootStackParamList } from '../navigation/AppNavigator';
+import { ErrorHandler, DatabaseErrorHandler } from '../utils/ErrorHandler';
+import { ConfirmationDialog } from '../utils/ConfirmationDialog';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
+
+const GST_SLABS = [0, 5, 12, 18, 28];
 
 type ProductDetailScreenRouteProp = RouteProp<RootStackParamList, 'ProductDetail'>;
 type ProductDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProductDetail'>;
 
-const GST_SLABS = [0, 5, 12, 18, 28];
+const styles = {
+  container: {
+    flex: 1,
+  },
+  centered: {
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  skeletonContainer: {
+    padding: 16,
+  },
+  skeletonImage: {
+    width: Dimensions.get('window').width - 32,
+    height: 300,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  skeletonContent: {
+    padding: 16,
+  },
+  skeletonTitle: {
+    height: 28,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  skeletonBadge: {
+    height: 24,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 12,
+    marginBottom: 8,
+    alignSelf: 'flex-start' as const,
+  },
+  skeletonPrice: {
+    height: 36,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  skeletonInfoGrid: {
+    flexDirection: 'row' as const,
+    gap: 12,
+  },
+  errorContainer: {
+    alignItems: 'center' as const,
+    padding: 32,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold' as const,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorSubtitle: {
+    fontSize: 16,
+    textAlign: 'center' as const,
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  errorButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  errorButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  customHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold' as const,
+  },
+  content: {
+    padding: 16,
+  },
+  imageSection: {
+    position: 'relative' as const,
+    marginBottom: 16,
+  },
+  productImage: {
+    width: Dimensions.get('window').width - 32,
+    height: 280,
+    borderRadius: 16,
+  },
+  noImageContainer: {
+    width: Dimensions.get('window').width - 32,
+    height: 280,
+    borderRadius: 16,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  noImageText: {
+    fontSize: 16,
+    fontWeight: '500' as const,
+    marginTop: 12,
+  },
+  discountBadge: {
+    position: 'absolute' as const,
+    top: 16,
+    right: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  discountText: {
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+  },
+  infoCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  productTitle: {
+    fontSize: 24,
+    fontWeight: 'bold' as const,
+    marginBottom: 16,
+    lineHeight: 32,
+  },
+  metaContainer: {
+    flexDirection: 'row' as const,
+    gap: 12,
+  },
+  categoryBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  stockBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  stockText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  priceCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  priceHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 16,
+    gap: 8,
+  },
+  priceLabel: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  discountContainer: {
+    gap: 12,
+  },
+  priceRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 12,
+  },
+  originalPrice: {
+    fontSize: 18,
+    textDecorationLine: 'line-through' as const,
+  },
+  discountPrice: {
+    fontSize: 32,
+    fontWeight: 'bold' as const,
+  },
+  savingsBadge: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6,
+    alignSelf: 'flex-start' as const,
+  },
+  savingsText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  regularPrice: {
+    fontSize: 32,
+    fontWeight: 'bold' as const,
+  },
+  infoGrid: {
+    flexDirection: 'row' as const,
+    gap: 12,
+    marginBottom: 16,
+  },
+  infoItem: {
+    flex: 1,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center' as const,
+  },
+  infoIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    marginBottom: 8,
+  },
+  infoValue: {
+    fontSize: 20,
+    fontWeight: 'bold' as const,
+  },
+  detailsCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  detailsHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 16,
+    gap: 8,
+  },
+  detailsTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+  },
+  detailsText: {
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  actionContainer: {
+    gap: 12,
+    marginBottom: 32,
+  },
+  editButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    gap: 8,
+  },
+  deleteButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    gap: 8,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  editHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  formContainer: {
+    padding: 16,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  row: {
+    flexDirection: 'row' as const,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: '500' as const,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden' as const,
+  },
+  picker: {
+    height: 54,
+  },
+  imagePicker: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    borderWidth: 2,
+    borderStyle: 'dashed' as const,
+    borderRadius: 12,
+    padding: 20,
+    gap: 12,
+  },
+  imagePickerText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  imagePreview: {
+    width: Dimensions.get('window').width - 64,
+    height: 200,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    minHeight: 120,
+    textAlignVertical: 'top' as const,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  modalBackdrop: {
+    flex: 1,
+    width: Dimensions.get('window').width,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  modalContent: {
+    position: 'relative' as const,
+    width: 300,
+    height: 400,
+  },
+  modalImage: {
+    width: 300,
+    height: 400,
+    borderRadius: 16,
+  },
+  closeButton: {
+    position: 'absolute' as const,
+    top: 8,
+    right: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+};
 
 const ProductDetailScreen = () => {
   const route = useRoute<ProductDetailScreenRouteProp>();
   const navigation = useNavigation<ProductDetailScreenNavigationProp>();
   const { colors } = useTheme();
   const { productId } = route.params;
-
   const windowWidth = Dimensions.get('window').width;
   const windowHeight = Dimensions.get('window').height;
 
@@ -257,38 +647,33 @@ const ProductDetailScreen = () => {
     setIsEditing(false);
   };
 
-  const handleDelete = () => {
-    Alert.alert(
-      'Delete Product',
-      `Are you sure you want to delete "${product?.name}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await DatabaseService.deleteProduct(productId);
-              Alert.alert('Success', 'Product deleted successfully', [
-                { text: 'OK', onPress: () => navigation.goBack() }
-              ]);
-            } catch (error) {
-              console.error('Error deleting product:', error);
-              Alert.alert('Error', 'Failed to delete product');
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleImageZoom = () => {
     if (product?.imageUri) {
       setImageModalVisible(true);
     }
   };
 
-  // Loading skeleton component
+  const handleDelete = () => {
+    if (!product) return;
+
+    ConfirmationDialog.showDelete(
+      product.name,
+      async () => {
+        try {
+          await DatabaseService.deleteProduct(productId);
+          Alert.alert('Success', 'Product deleted successfully', [
+            { text: 'OK', onPress: () => navigation.goBack() }
+          ]);
+        } catch (error) {
+          ErrorHandler.handle(
+            DatabaseErrorHandler.createDatabaseError('Failed to delete product', error as Error),
+            'ProductDetailScreen.handleDelete'
+          );
+        }
+      }
+    );
+  };
+
   const LoadingSkeleton = () => (
     <View style={styles.skeletonContainer}>
       <View style={styles.skeletonImage} />
@@ -810,395 +1195,5 @@ const ProductDetailScreen = () => {
     </Animated.ScrollView>
   );
 };
-
-const styles = {
-  container: {
-    flex: 1,
-  },
-  centered: {
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  skeletonContainer: {
-    padding: 16,
-  },
-  skeletonImage: {
-    width: Dimensions.get('window').width - 32,
-    height: 300,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  skeletonContent: {
-    padding: 16,
-  },
-  skeletonTitle: {
-    height: 28,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  skeletonBadge: {
-    height: 24,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 12,
-    marginBottom: 8,
-    alignSelf: 'flex-start' as const,
-  },
-  skeletonPrice: {
-    height: 36,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  skeletonInfoGrid: {
-    flexDirection: 'row' as const,
-    gap: 12,
-  },
-  errorContainer: {
-    alignItems: 'center' as const,
-    padding: 32,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: 'bold' as const,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  errorSubtitle: {
-    fontSize: 16,
-    textAlign: 'center' as const,
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  errorButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  errorButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  customHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold' as const,
-  },
-  content: {
-    padding: 16,
-  },
-  imageSection: {
-    position: 'relative' as const,
-    marginBottom: 16,
-  },
-  productImage: {
-    width: Dimensions.get('window').width - 32,
-    height: 280,
-    borderRadius: 16,
-  },
-  noImageContainer: {
-    width: Dimensions.get('window').width - 32,
-    height: 280,
-    borderRadius: 16,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  noImageText: {
-    fontSize: 16,
-    fontWeight: '500' as const,
-    marginTop: 12,
-  },
-  discountBadge: {
-    position: 'absolute' as const,
-    top: 16,
-    right: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  discountText: {
-    fontSize: 14,
-    fontWeight: 'bold' as const,
-  },
-  infoCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  productTitle: {
-    fontSize: 24,
-    fontWeight: 'bold' as const,
-    marginBottom: 16,
-    lineHeight: 32,
-  },
-  metaContainer: {
-    flexDirection: 'row' as const,
-    gap: 12,
-  },
-  categoryBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  stockBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  stockText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  priceCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  priceHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginBottom: 16,
-    gap: 8,
-  },
-  priceLabel: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  discountContainer: {
-    gap: 12,
-  },
-  priceRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 12,
-  },
-  originalPrice: {
-    fontSize: 18,
-    textDecorationLine: 'line-through' as const,
-  },
-  discountPrice: {
-    fontSize: 32,
-    fontWeight: 'bold' as const,
-  },
-  savingsBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    gap: 6,
-    alignSelf: 'flex-start' as const,
-  },
-  savingsText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  regularPrice: {
-    fontSize: 32,
-    fontWeight: 'bold' as const,
-  },
-  infoGrid: {
-    flexDirection: 'row' as const,
-    gap: 12,
-    marginBottom: 16,
-  },
-  infoItem: {
-    flex: 1,
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center' as const,
-  },
-  infoIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    marginBottom: 12,
-  },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '500' as const,
-    marginBottom: 8,
-  },
-  infoValue: {
-    fontSize: 20,
-    fontWeight: 'bold' as const,
-  },
-  detailsCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  detailsHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginBottom: 16,
-    gap: 8,
-  },
-  detailsTitle: {
-    fontSize: 18,
-    fontWeight: '600' as const,
-  },
-  detailsText: {
-    fontSize: 15,
-    lineHeight: 24,
-  },
-  actionContainer: {
-    gap: 12,
-    marginBottom: 32,
-  },
-  editButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    gap: 8,
-  },
-  deleteButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    gap: 8,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  editHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  formContainer: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  row: {
-    flexDirection: 'row' as const,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    marginTop: 4,
-    fontWeight: '500' as const,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderRadius: 12,
-    overflow: 'hidden' as const,
-  },
-  picker: {
-    height: 54,
-  },
-  imagePicker: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    borderWidth: 2,
-    borderStyle: 'dashed' as const,
-    borderRadius: 12,
-    padding: 20,
-    gap: 12,
-  },
-  imagePickerText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  imagePreview: {
-    width: Dimensions.get('window').width - 64,
-    height: 200,
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    minHeight: 120,
-    textAlignVertical: 'top' as const,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  modalBackdrop: {
-    flex: 1,
-    width: Dimensions.get('window').width,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  modalContent: {
-    position: 'relative' as const,
-    width: 300,
-    height: 400,
-  },
-  modalImage: {
-    width: 300,
-    height: 400,
-    borderRadius: 16,
-  },
-  closeButton: {
-    position: 'absolute' as const,
-    top: -50,
-    right: -50,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-} as const;
 
 export default ProductDetailScreen;

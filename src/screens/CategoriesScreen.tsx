@@ -15,6 +15,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { RootDrawerParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
 import DatabaseService, { Category } from '../database/DatabaseService';
+import { ErrorHandler, DatabaseErrorHandler } from '../utils/ErrorHandler';
+import { ConfirmationDialog } from '../utils/ConfirmationDialog';
 
 interface CategoryWithCount extends Category {
   count: number;
@@ -60,8 +62,10 @@ const CategoriesScreen = () => {
       setCategories(categoriesWithCount);
       setFilteredCategories(categoriesWithCount);
     } catch (error) {
-      console.error('Error loading categories:', error);
-      Alert.alert('Error', 'Failed to load categories');
+      ErrorHandler.handle(
+        DatabaseErrorHandler.createDatabaseError('Failed to load categories', error as Error),
+        'CategoriesScreen.loadCategories'
+      );
     } finally {
       setLoading(false);
     }
@@ -122,8 +126,10 @@ const CategoriesScreen = () => {
       setNewCategoryName('');
       Alert.alert('Success', `Category "${trimmedCategory}" added successfully`);
     } catch (error) {
-      console.error('Error adding category:', error);
-      Alert.alert('Error', 'Failed to add category');
+      ErrorHandler.handle(
+        DatabaseErrorHandler.createDatabaseError('Failed to add category', error as Error),
+        'CategoriesScreen.handleAddCategory'
+      );
     }
   };
 
@@ -131,8 +137,12 @@ const CategoriesScreen = () => {
     <TouchableOpacity
       style={styles.categoryItem}
       onPress={() => {
-        console.log('Navigating to CategoryProducts with category:', item.name);
-        navigation.navigate('CategoryProducts', { categoryName: item.name });
+        try {
+          console.log('Navigating to CategoryProducts with category:', item.name);
+          navigation.navigate('CategoryProducts', { categoryName: item.name });
+        } catch (error) {
+          ErrorHandler.handle(error as Error, 'CategoriesScreen.renderCategoryItem', true);
+        }
       }}
     >
       <View style={styles.categoryInfo}>
