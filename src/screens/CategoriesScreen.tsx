@@ -27,13 +27,26 @@ const CategoriesScreen = () => {
   const { colors } = useTheme();
   const styles = getStyles(colors);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<CategoryWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredCategories(categories);
+    } else {
+      const filtered = categories.filter(category =>
+        category.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredCategories(filtered);
+    }
+  }, [searchQuery, categories]);
 
   const loadCategories = async () => {
     try {
@@ -45,6 +58,7 @@ const CategoriesScreen = () => {
 
       const categoriesWithCount = await DatabaseService.getCategoriesWithProductCount();
       setCategories(categoriesWithCount);
+      setFilteredCategories(categoriesWithCount);
     } catch (error) {
       console.error('Error loading categories:', error);
       Alert.alert('Error', 'Failed to load categories');
@@ -102,6 +116,7 @@ const CategoriesScreen = () => {
       // Refresh categories from database
       const updatedCategories = await DatabaseService.getCategoriesWithProductCount();
       setCategories(updatedCategories);
+      setFilteredCategories(updatedCategories);
 
       setModalVisible(false);
       setNewCategoryName('');
@@ -156,18 +171,50 @@ const CategoriesScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search categories..."
+          placeholderTextColor={colors.text.disabled}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={() => setSearchQuery('')}
+          >
+            <Icon name="clear" size={20} color={colors.text.secondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading categories...</Text>
         </View>
       ) : (
-        <FlatList
-          data={categories}
-          renderItem={renderCategoryItem}
-          keyExtractor={(item) => item.name}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContainer}
-        />
+        <>
+          {filteredCategories.length === 0 && searchQuery.trim() !== '' ? (
+            <View style={styles.noResultsContainer}>
+              <Icon name="search-off" size={48} color={colors.text.disabled} />
+              <Text style={styles.noResultsText}>No categories found</Text>
+              <Text style={styles.noResultsSubtext}>
+                Try adjusting your search terms
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredCategories}
+              renderItem={renderCategoryItem}
+              keyExtractor={(item) => item.name}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContainer}
+            />
+          )}
+        </>
       )}
 
       {/* Add Category Modal */}
@@ -270,6 +317,48 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 6,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    margin: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text.primary,
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  noResultsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
