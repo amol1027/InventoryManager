@@ -19,6 +19,13 @@ export interface Product {
   updatedAt?: string;
 }
 
+export interface Category {
+  id?: number;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 class DatabaseService {
   private database: Database | null = null;
   private initialized: boolean = false;
@@ -61,11 +68,22 @@ class DatabaseService {
       )
     `;
 
+    const createCategoryTableQuery = `
+      CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
     try {
       await this.database.executeSql(createProductTableQuery);
       console.log('Products table created successfully');
+      await this.database.executeSql(createCategoryTableQuery);
+      console.log('Categories table created successfully');
     } catch (error) {
-      console.error('Error creating products table:', error);
+      console.error('Error creating tables:', error);
       throw error;
     }
   }
@@ -241,6 +259,120 @@ class DatabaseService {
       await this.database.close();
       this.database = null;
       this.initialized = false;
+    }
+  }
+
+  // Category management methods
+  async addCategory(category: Category): Promise<number> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    const { name } = category;
+    const now = new Date().toISOString();
+
+    try {
+      const [result] = await this.database.executeSql(
+        `INSERT INTO categories (name, createdAt, updatedAt) VALUES (?, ?, ?)`,
+        [name, now, now]
+      );
+
+      return result.insertId || 0;
+    } catch (error) {
+      console.error('Error adding category:', error);
+      throw error;
+    }
+  }
+
+  async updateCategory(category: Category): Promise<void> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+    if (!category.id) throw new Error('Category ID is required for update');
+
+    const { id, name } = category;
+    const now = new Date().toISOString();
+
+    try {
+      await this.database.executeSql(
+        `UPDATE categories SET name = ?, updatedAt = ? WHERE id = ?`,
+        [name, now, id]
+      );
+    } catch (error) {
+      console.error('Error updating category:', error);
+      throw error;
+    }
+  }
+
+  async deleteCategory(id: number): Promise<void> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      await this.database.executeSql('DELETE FROM categories WHERE id = ?', [id]);
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      throw error;
+    }
+  }
+
+  async getCategoryById(id: number): Promise<Category | null> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [result] = await this.database.executeSql(
+        'SELECT * FROM categories WHERE id = ?',
+        [id]
+      );
+
+      if (result.rows.length === 0) return null;
+      return result.rows.item(0);
+    } catch (error) {
+      console.error('Error getting category by ID:', error);
+      throw error;
+    }
+  }
+
+  async getAllCategories(): Promise<Category[]> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [result] = await this.database.executeSql('SELECT * FROM categories ORDER BY name');
+      const categories: Category[] = [];
+
+      for (let i = 0; i < result.rows.length; i++) {
+        categories.push(result.rows.item(i));
+      }
+
+      return categories;
+    } catch (error) {
+      console.error('Error getting all categories:', error);
+      throw error;
+    }
+  }
+
+  async getCategoriesWithProductCount(): Promise<Array<Category & { count: number }>> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [result] = await this.database.executeSql(`
+        SELECT c.*, COUNT(p.id) as count
+        FROM categories c
+        LEFT JOIN products p ON c.name = p.category
+        GROUP BY c.id, c.name, c.createdAt, c.updatedAt
+        ORDER BY c.name
+      `);
+
+      const categories: Array<Category & { count: number }> = [];
+      for (let i = 0; i < result.rows.length; i++) {
+        categories.push(result.rows.item(i));
+      }
+
+      return categories;
+    } catch (error) {
+      console.error('Error getting categories with product count:', error);
+      throw error;
     }
   }
 }

@@ -14,10 +14,9 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { RootDrawerParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
-import DatabaseService from '../database/DatabaseService';
+import DatabaseService, { Category } from '../database/DatabaseService';
 
-interface Category {
-  name: string;
+interface CategoryWithCount extends Category {
   count: number;
 }
 
@@ -27,7 +26,7 @@ const CategoriesScreen = () => {
   const navigation = useNavigation<CategoriesScreenNavigationProp>();
   const { colors } = useTheme();
   const styles = getStyles(colors);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -39,28 +38,46 @@ const CategoriesScreen = () => {
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const products = await DatabaseService.getAllProducts();
+      await DatabaseService.initDatabase();
 
-      // Group products by category and count them
-      const categoryMap = new Map<string, number>();
-      products.forEach((product) => {
-        const count = categoryMap.get(product.category) || 0;
-        categoryMap.set(product.category, count + 1);
-      });
+      // Initialize with default categories if none exist
+      await initializeDefaultCategories();
 
-      const categoriesData: Category[] = Array.from(categoryMap.entries()).map(
-        ([name, count]) => ({
-          name,
-          count,
-        })
-      );
-
-      setCategories(categoriesData);
+      const categoriesWithCount = await DatabaseService.getCategoriesWithProductCount();
+      setCategories(categoriesWithCount);
     } catch (error) {
       console.error('Error loading categories:', error);
       Alert.alert('Error', 'Failed to load categories');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const initializeDefaultCategories = async () => {
+    try {
+      const existingCategories = await DatabaseService.getAllCategories();
+
+      if (existingCategories.length === 0) {
+        const defaultCategories = [
+          'Electronics',
+          'Clothing',
+          'Home & Kitchen',
+          'Books',
+          'Toys & Games',
+          'Beauty & Personal Care',
+          'Sports & Outdoors',
+          'Automotive',
+          'Office Supplies',
+          'Other',
+        ];
+
+        for (const categoryName of defaultCategories) {
+          await DatabaseService.addCategory({ name: categoryName });
+        }
+        console.log('Default categories initialized');
+      }
+    } catch (error) {
+      console.error('Error initializing default categories:', error);
     }
   };
 
@@ -79,14 +96,13 @@ const CategoriesScreen = () => {
     }
 
     try {
-      // For new categories, we'll add a placeholder category with 0 products
-      // This allows users to see the category before adding products to it
-      const newCategory: Category = {
-        name: trimmedCategory,
-        count: 0,
-      };
+      // Add category to database
+      await DatabaseService.addCategory({ name: trimmedCategory });
 
-      setCategories(prevCategories => [...prevCategories, newCategory]);
+      // Refresh categories from database
+      const updatedCategories = await DatabaseService.getCategoriesWithProductCount();
+      setCategories(updatedCategories);
+
       setModalVisible(false);
       setNewCategoryName('');
       Alert.alert('Success', `Category "${trimmedCategory}" added successfully`);
@@ -96,7 +112,7 @@ const CategoriesScreen = () => {
     }
   };
 
-  const renderCategoryItem = ({ item }: { item: Category }) => (
+  const renderCategoryItem = ({ item }: { item: CategoryWithCount }) => (
     <TouchableOpacity
       style={styles.categoryItem}
       onPress={() => {

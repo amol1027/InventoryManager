@@ -27,19 +27,6 @@ import { useTheme } from '../theme/ThemeContext';
 type ProductDetailScreenRouteProp = RouteProp<RootStackParamList, 'ProductDetail'>;
 type ProductDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProductDetail'>;
 
-const CATEGORIES = [
-  'Electronics',
-  'Clothing',
-  'Home & Kitchen',
-  'Books',
-  'Toys & Games',
-  'Beauty & Personal Care',
-  'Sports & Outdoors',
-  'Automotive',
-  'Office Supplies',
-  'Other',
-];
-
 const GST_SLABS = [0, 5, 12, 18, 28];
 
 const ProductDetailScreen = () => {
@@ -62,6 +49,7 @@ const ProductDetailScreen = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [imageScale, setImageScale] = useState(new Animated.Value(1));
+  const [categories, setCategories] = useState<string[]>([]);
 
   // Form state
   const [name, setName] = useState('');
@@ -83,6 +71,10 @@ const ProductDetailScreen = () => {
   }, [productId]);
 
   useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
     if (!loading && product) {
       // Animate content in
       Animated.parallel([
@@ -99,6 +91,17 @@ const ProductDetailScreen = () => {
       ]).start();
     }
   }, [loading, product]);
+
+  const loadCategories = async () => {
+    try {
+      await DatabaseService.initDatabase();
+      const categoriesData = await DatabaseService.getAllCategories();
+      const categoryNames = categoriesData.map(cat => cat.name);
+      setCategories(categoryNames);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
 
   const loadProduct = async () => {
     try {
@@ -418,7 +421,7 @@ const ProductDetailScreen = () => {
                 onValueChange={setCategory}
                 style={[styles.picker, { color: colors.text.primary }]}
               >
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <Picker.Item key={cat} label={cat} value={cat} />
                 ))}
               </Picker>
