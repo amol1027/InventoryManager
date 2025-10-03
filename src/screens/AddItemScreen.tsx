@@ -46,19 +46,26 @@ const AddItemScreen = () => {
       try {
         setLoadingCategories(true);
         await DatabaseService.initDatabase();
-        const allProducts = await DatabaseService.getAllProducts();
 
-        // Extract unique categories from products
-        const uniqueCategories = [...new Set(allProducts.map(product => product.category))];
+        // Try to get categories from the categories table first
+        let categoriesList = await DatabaseService.getAllCategories();
+
+        if (categoriesList.length === 0) {
+          // If no categories exist, initialize with defaults and reload
+          await initializeDefaultCategories();
+          categoriesList = await DatabaseService.getAllCategories();
+        }
+
+        const categoryNames = categoriesList.map(cat => cat.name);
 
         // Sort categories alphabetically
-        uniqueCategories.sort();
+        categoryNames.sort();
 
-        setCategories(uniqueCategories);
+        setCategories(categoryNames);
 
         // Set default category if categories exist
-        if (uniqueCategories.length > 0) {
-          setCategory(uniqueCategories[0]);
+        if (categoryNames.length > 0) {
+          setCategory(categoryNames[0]);
         }
       } catch (error) {
         console.error('Error loading categories:', error);
@@ -73,6 +80,30 @@ const AddItemScreen = () => {
 
     loadCategories();
   }, []);
+
+  const initializeDefaultCategories = async () => {
+    try {
+      const defaultCategories = [
+        'Electronics',
+        'Clothing',
+        'Home & Kitchen',
+        'Books',
+        'Toys & Games',
+        'Beauty & Personal Care',
+        'Sports & Outdoors',
+        'Automotive',
+        'Office Supplies',
+        'Other',
+      ];
+
+      for (const categoryName of defaultCategories) {
+        await DatabaseService.addCategory({ name: categoryName });
+      }
+      console.log('Default categories initialized in AddItemScreen');
+    } catch (error) {
+      console.error('Error initializing default categories:', error);
+    }
+  };
 
   const validateForm = () => {
     let isValid = true;

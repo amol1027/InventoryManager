@@ -14,10 +14,9 @@ import { DrawerNavigationProp } from '@react-navigation/drawer';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { RootDrawerParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
-import DatabaseService from '../database/DatabaseService';
+import DatabaseService, { Category } from '../database/DatabaseService';
 
-interface Category {
-  name: string;
+interface CategoryWithCount extends Category {
   count: number;
 }
 
@@ -27,40 +26,72 @@ const CategoriesScreen = () => {
   const navigation = useNavigation<CategoriesScreenNavigationProp>();
   const { colors } = useTheme();
   const styles = getStyles(colors);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<CategoryWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadCategories();
   }, []);
 
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredCategories(categories);
+    } else {
+      const filtered = categories.filter(category =>
+        category.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredCategories(filtered);
+    }
+  }, [searchQuery, categories]);
+
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const products = await DatabaseService.getAllProducts();
+      await DatabaseService.initDatabase();
 
-      // Group products by category and count them
-      const categoryMap = new Map<string, number>();
-      products.forEach((product) => {
-        const count = categoryMap.get(product.category) || 0;
-        categoryMap.set(product.category, count + 1);
-      });
+      // Initialize with default categories if none exist
+      await initializeDefaultCategories();
 
-      const categoriesData: Category[] = Array.from(categoryMap.entries()).map(
-        ([name, count]) => ({
-          name,
-          count,
-        })
-      );
-
-      setCategories(categoriesData);
+      const categoriesWithCount = await DatabaseService.getCategoriesWithProductCount();
+      setCategories(categoriesWithCount);
+      setFilteredCategories(categoriesWithCount);
     } catch (error) {
       console.error('Error loading categories:', error);
       Alert.alert('Error', 'Failed to load categories');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const initializeDefaultCategories = async () => {
+    try {
+      const existingCategories = await DatabaseService.getAllCategories();
+
+      if (existingCategories.length === 0) {
+        const defaultCategories = [
+          'Electronics',
+          'Clothing',
+          'Home & Kitchen',
+          'Books',
+          'Toys & Games',
+          'Beauty & Personal Care',
+          'Sports & Outdoors',
+          'Automotive',
+          'Office Supplies',
+          'Other',
+        ];
+
+        for (const categoryName of defaultCategories) {
+          await DatabaseService.addCategory({ name: categoryName });
+        }
+        console.log('Default categories initialized');
+      }
+    } catch (error) {
+      console.error('Error initializing default categories:', error);
     }
   };
 
@@ -79,14 +110,14 @@ const CategoriesScreen = () => {
     }
 
     try {
-      // For new categories, we'll add a placeholder category with 0 products
-      // This allows users to see the category before adding products to it
-      const newCategory: Category = {
-        name: trimmedCategory,
-        count: 0,
-      };
+      // Add category to database
+      await DatabaseService.addCategory({ name: trimmedCategory });
 
-      setCategories(prevCategories => [...prevCategories, newCategory]);
+      // Refresh categories from database
+      const updatedCategories = await DatabaseService.getCategoriesWithProductCount();
+      setCategories(updatedCategories);
+      setFilteredCategories(updatedCategories);
+
       setModalVisible(false);
       setNewCategoryName('');
       Alert.alert('Success', `Category "${trimmedCategory}" added successfully`);
@@ -96,7 +127,7 @@ const CategoriesScreen = () => {
     }
   };
 
-  const renderCategoryItem = ({ item }: { item: Category }) => (
+  const renderCategoryItem = ({ item }: { item: CategoryWithCount }) => (
     <TouchableOpacity
       style={styles.categoryItem}
       onPress={() => {
@@ -140,18 +171,50 @@ const CategoriesScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Icon name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search categories..."
+          placeholderTextColor={colors.text.disabled}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={() => setSearchQuery('')}
+          >
+            <Icon name="clear" size={20} color={colors.text.secondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading categories...</Text>
         </View>
       ) : (
-        <FlatList
-          data={categories}
-          renderItem={renderCategoryItem}
-          keyExtractor={(item) => item.name}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContainer}
-        />
+        <>
+          {filteredCategories.length === 0 && searchQuery.trim() !== '' ? (
+            <View style={styles.noResultsContainer}>
+              <Icon name="search-off" size={48} color={colors.text.disabled} />
+              <Text style={styles.noResultsText}>No categories found</Text>
+              <Text style={styles.noResultsSubtext}>
+                Try adjusting your search terms
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredCategories}
+              renderItem={renderCategoryItem}
+              keyExtractor={(item) => item.name}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContainer}
+            />
+          )}
+        </>
       )}
 
       {/* Add Category Modal */}
@@ -254,6 +317,48 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 6,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    margin: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text.primary,
+    paddingVertical: 4,
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  noResultsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
