@@ -10,6 +10,8 @@ import {
   TextInput,
   Image,
   Dimensions,
+} from 'react-native';
+import {
   Animated,
   Modal,
   Share,
@@ -24,6 +26,7 @@ import { ErrorHandler, DatabaseErrorHandler } from '../utils/ErrorHandler';
 import { ConfirmationDialog } from '../utils/ConfirmationDialog';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
+import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
 
 const GST_SLABS = [0, 5, 12, 18, 28];
 
@@ -418,6 +421,19 @@ const styles = {
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
   },
+  finalPriceContainer: {
+    backgroundColor: '#28a74520',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginTop: 8,
+    alignSelf: 'flex-start' as const,
+  },
+  finalPriceLabel: {
+    color: '#28a745',
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
 };
 
 const ProductDetailScreen = () => {
@@ -719,9 +735,8 @@ const ProductDetailScreen = () => {
     );
   }
 
-  const discountPercentage = product.discountPrice
-    ? Math.round(((product.price - product.discountPrice) / product.price) * 100)
-    : 0;
+  const discountPercentage = calculateDiscountPercentage(product.price, product.discountPrice || product.price);
+  const priceCalculation = calculateFinalPrice(product.price, product.discountPrice, product.gstSlab || 0);
 
   const stockStatus = !product.quantity || product.quantity === 0
     ? {
@@ -1073,6 +1088,12 @@ const ProductDetailScreen = () => {
 
           {product.discountPrice ? (
             <View style={styles.discountContainer}>
+              <Text style={[styles.regularPrice, { color: colors.success, fontSize: 28 }]}>
+                {formatPrice(priceCalculation.finalPrice)}
+              </Text>
+              <Text style={[styles.finalPriceLabel, { color: colors.success, marginTop: 4 }]}>
+                Final Price (incl. GST)
+              </Text>
               <View style={styles.priceRow}>
                 <Text style={[styles.originalPrice, { color: colors.text.secondary }]}>
                   ₹{product.price.toFixed(2)}
@@ -1089,9 +1110,14 @@ const ProductDetailScreen = () => {
               </View>
             </View>
           ) : (
-            <Text style={[styles.regularPrice, { color: colors.primary }]}>
-              ₹{product.price.toFixed(2)}
-            </Text>
+            <View>
+              <Text style={[styles.regularPrice, { color: colors.success, fontSize: 28 }]}>
+                {formatPrice(priceCalculation.finalPrice)}
+              </Text>
+              <Text style={[styles.finalPriceLabel, { color: colors.success, marginTop: 4 }]}>
+                Final Price (incl. GST)
+              </Text>
+            </View>
           )}
         </View>
 

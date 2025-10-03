@@ -18,6 +18,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { RootDrawerParamList } from '../navigation/AppNavigator';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
+import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
 
 type CategoryProductsScreenNavigationProp = DrawerNavigationProp<RootDrawerParamList, 'CategoryProducts'>;
 type CategoryProductsScreenRouteProp = RouteProp<RootDrawerParamList, 'CategoryProducts'>;
@@ -186,6 +187,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  finalPriceContainer: {
+    backgroundColor: colors.success + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  finalPriceLabel: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   loader: {
     flex: 1,
     justifyContent: 'center',
@@ -269,9 +282,8 @@ const CategoryProductsScreen = () => {
   };
 
   const renderItem = ({ item }: { item: Product }) => {
-    const discountPercentage = item.discountPrice
-      ? Math.round(((item.price - item.discountPrice) / item.price) * 100)
-      : 0;
+    const discountPercentage = calculateDiscountPercentage(item.price, item.discountPrice || item.price);
+    const priceCalculation = calculateFinalPrice(item.price, item.discountPrice, item.gstSlab || 0);
 
     return (
       <TouchableOpacity
@@ -322,6 +334,11 @@ const CategoryProductsScreen = () => {
             ) : (
               <Text style={styles.price}>₹{item.price.toFixed(2)}</Text>
             )}
+            <View style={[styles.finalPriceContainer, { backgroundColor: colors.success + '20' }]}>
+              <Text style={[styles.finalPriceLabel, { color: colors.success }]}>
+                Final: {formatPrice(priceCalculation.finalPrice)}
+              </Text>
+            </View>
           </View>
         </View>
         <Icon name="chevron-right" size={24} color={colors.text.secondary} />
