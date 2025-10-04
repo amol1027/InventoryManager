@@ -28,7 +28,6 @@ import CustomDrawerContent from './CustomDrawerContent';
 export type RootDrawerParamList = {
   MainStack: undefined;
   Categories: undefined;
-  CategoryProducts: { categoryName: string };
   Settings: undefined;
   About: undefined;
 };
@@ -37,6 +36,7 @@ export type RootStackParamList = {
   Dashboard: undefined;
   AddItem: undefined;
   ProductDetail: { productId: number };
+  CategoryProducts: { categoryName: string };
 };
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
@@ -127,6 +127,14 @@ const MainStack = () => {
           }}
         />
         <Stack.Screen
+          name="CategoryProducts"
+          component={CategoryProductsScreen}
+          options={{
+            title: 'Products',
+            headerShown: true,
+          }}
+        />
+        <Stack.Screen
           name="ProductDetail"
           component={ProductDetailScreen}
           options={{
@@ -188,14 +196,6 @@ const AppNavigator = () => {
           options={{
             drawerLabel: 'Categories',
             title: 'Categories',
-          }}
-        />
-        <Drawer.Screen
-          name="CategoryProducts"
-          component={CategoryProductsScreen}
-          options={{
-            drawerLabel: 'Category Products',
-            title: 'Products',
           }}
         />
         <Drawer.Screen

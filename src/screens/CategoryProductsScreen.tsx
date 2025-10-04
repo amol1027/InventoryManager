@@ -12,16 +12,16 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-import { RootDrawerParamList } from '../navigation/AppNavigator';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
 import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
 
-type CategoryProductsScreenNavigationProp = DrawerNavigationProp<RootDrawerParamList, 'CategoryProducts'>;
-type CategoryProductsScreenRouteProp = RouteProp<RootDrawerParamList, 'CategoryProducts'>;
+type CategoryProductsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CategoryProducts'>;
+type CategoryProductsScreenRouteProp = RouteProp<RootStackParamList, 'CategoryProducts'>;
 
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -289,11 +289,13 @@ const CategoryProductsScreen = () => {
       <TouchableOpacity
         style={styles.productCard}
         onPress={() => {
-          // Navigate to MainStack first, then to ProductDetail
-          navigation.navigate('MainStack');
-          // Note: ProductDetail navigation will need to be handled differently
-          // For now, let's just navigate to MainStack and show an alert
-          Alert.alert('Navigation', 'Product detail view will be implemented');
+          try {
+            // Navigate to ProductDetail screen within the same stack
+            navigation.navigate('ProductDetail', { productId: item.id! });
+          } catch (error) {
+            console.error('Error navigating to product detail:', error);
+            Alert.alert('Error', 'Failed to open product details');
+          }
         }}
       >
         {item.imageUri && (

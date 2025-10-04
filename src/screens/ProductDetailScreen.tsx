@@ -282,18 +282,6 @@ const styles = {
     marginBottom: 16,
   },
   detailsHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginBottom: 16,
-    gap: 8,
-  },
-  detailsTitle: {
-    fontSize: 18,
-    fontWeight: '600' as const,
-  },
-  detailsText: {
-    fontSize: 15,
-    lineHeight: 24,
   },
   actionContainer: {
     gap: 12,
@@ -344,14 +332,6 @@ const styles = {
     marginBottom: 8,
   },
   input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-  },
-  errorText: {
-    fontSize: 14,
-    marginTop: 4,
     fontWeight: '500' as const,
   },
   pickerContainer: {
@@ -433,6 +413,64 @@ const styles = {
     color: '#28a745',
     fontSize: 14,
     fontWeight: '600' as const,
+  },
+  priceContainer: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  priceDetailsContainer: {
+    alignItems: 'center' as const,
+    minWidth: 60,
+  },
+  finalPrice: {
+    fontSize: 18,
+    fontWeight: 'bold' as const,
+  },
+  gstContainer: {
+    alignItems: 'center' as const,
+    minWidth: 60,
+  },
+  gstAmount: {
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+  },
+  gstLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  discountAmount: {
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+  },
+  discountLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  basePriceContainer: {
+    alignItems: 'center' as const,
+    minWidth: 60,
+  },
+  basePrice: {
+    fontSize: 14,
+    textDecorationLine: 'line-through' as const,
+  },
+  basePriceLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  errorText: {
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: '500' as const,
+  },
+  detailsTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+  },
+  detailsText: {
+    fontSize: 15,
+    lineHeight: 24,
   },
 };
 
@@ -1044,14 +1082,6 @@ const ProductDetailScreen = () => {
               </View>
             )}
           </TouchableOpacity>
-
-          {discountPercentage > 0 && (
-            <View style={[styles.discountBadge, { backgroundColor: colors.accent }]}>
-              <Text style={[styles.discountText, { color: colors.text.inverse }]}>
-                {discountPercentage}% OFF
-              </Text>
-            </View>
-          )}
         </View>
 
         {/* Product Info Card */}
@@ -1086,39 +1116,42 @@ const ProductDetailScreen = () => {
             </Text>
           </View>
 
-          {product.discountPrice ? (
-            <View style={styles.discountContainer}>
-              <Text style={[styles.regularPrice, { color: colors.success, fontSize: 28 }]}>
+          <View style={styles.priceContainer}>
+            <View style={styles.priceDetailsContainer}>
+              <Text style={[styles.finalPrice, { color: colors.success, fontSize: 28 }]}>
                 {formatPrice(priceCalculation.finalPrice)}
               </Text>
               <Text style={[styles.finalPriceLabel, { color: colors.success, marginTop: 4 }]}>
-                Final Price (incl. GST)
-              </Text>
-              <View style={styles.priceRow}>
-                <Text style={[styles.originalPrice, { color: colors.text.secondary }]}>
-                  ₹{product.price.toFixed(2)}
-                </Text>
-                <Text style={[styles.discountPrice, { color: colors.accent }]}>
-                  ₹{product.discountPrice.toFixed(2)}
-                </Text>
-              </View>
-              <View style={[styles.savingsBadge, { backgroundColor: colors.accent }]}>
-                <Icon name="savings" size={16} color={colors.text.inverse} />
-                <Text style={[styles.savingsText, { color: colors.text.inverse }]}>
-                  Save ₹{(product.price - product.discountPrice).toFixed(2)} ({discountPercentage}%)
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <View>
-              <Text style={[styles.regularPrice, { color: colors.success, fontSize: 28 }]}>
-                {formatPrice(priceCalculation.finalPrice)}
-              </Text>
-              <Text style={[styles.finalPriceLabel, { color: colors.success, marginTop: 4 }]}>
-                Final Price (incl. GST)
+                After GST
               </Text>
             </View>
-          )}
+            <View style={styles.gstContainer}>
+              <Text style={[styles.gstAmount, { color: colors.secondary }]}>
+                +₹{priceCalculation.gstAmount.toFixed(2)}
+              </Text>
+              <Text style={[styles.gstLabel, { color: colors.text.secondary, marginTop: 2 }]}>
+                {priceCalculation.gstPercentage}% GST
+              </Text>
+            </View>
+            {product.discountPrice && (
+              <View style={styles.discountContainer}>
+                <Text style={[styles.discountAmount, { color: colors.accent }]}>
+                  -₹{(product.price - product.discountPrice).toFixed(2)}
+                </Text>
+                <Text style={[styles.discountLabel, { color: colors.text.secondary, marginTop: 2 }]}>
+                  Discount
+                </Text>
+              </View>
+            )}
+            <View style={styles.basePriceContainer}>
+              <Text style={[styles.basePrice, { color: colors.text.secondary }]}>
+                ₹{product.price.toFixed(2)}
+              </Text>
+              <Text style={[styles.basePriceLabel, { color: colors.text.secondary, marginTop: 2 }]}>
+                Base
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Info Grid */}

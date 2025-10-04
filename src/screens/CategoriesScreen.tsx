@@ -209,7 +209,10 @@ const CategoriesScreen = () => {
         onPress={() => {
           try {
             console.log('Navigating to CategoryProducts with category:', item.name);
-            navigation.navigate('CategoryProducts', { categoryName: item.name });
+            navigation.navigate('MainStack', {
+              screen: 'CategoryProducts',
+              params: { categoryName: item.name }
+            } as never);
           } catch (error) {
             ErrorHandler.handle(error as Error, 'CategoriesScreen.renderCategoryItem', true);
           }

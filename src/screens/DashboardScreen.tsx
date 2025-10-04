@@ -17,6 +17,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
+import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
 
 type DashboardScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Dashboard'>;
 type SortOption = 'category' | 'nameAsc' | 'nameDesc' | 'priceAsc' | 'priceDesc' | 'discount';
@@ -91,29 +92,68 @@ const getStyles = (colors: any) => StyleSheet.create({
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   price: {
     fontSize: 16,
     fontWeight: 'bold',
     color: colors.primary,
   },
-  originalPrice: {
-    fontSize: 14,
-    textDecorationLine: 'line-through',
-    color: colors.text.secondary,
-    marginRight: 8,
+  priceDetailsContainer: {
+    alignItems: 'center',
+    minWidth: 60,
   },
-  discountBadge: {
-    backgroundColor: colors.error,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  discountText: {
-    color: colors.text.inverse,
-    fontSize: 12,
+  finalPrice: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: colors.success,
+  },
+  finalPriceLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  gstContainer: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  gstAmount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: colors.secondary,
+  },
+  gstLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  discountContainer: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  discountAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.accent,
+  },
+  discountLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  basePriceContainer: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  basePrice: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textDecorationLine: 'line-through',
+  },
+  basePriceLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -253,11 +293,10 @@ const DashboardScreen = () => {
   };
 
   const renderProductItem = ({ item }: { item: ExtendedProduct }) => {
-    // Calculate discount percentage if discount price exists
-    const discountPercentage = item.discountPrice
-      ? Math.round(((item.price - item.discountPrice) / item.price) * 100)
-      : 0;
-    const hasDiscount = item.discountPrice && item.discountPrice < item.price;
+    // Calculate prices
+    const priceCalculation = calculateFinalPrice(item.price || 0, item.discountPrice, item.gstSlab || 0);
+    const discountAmount = item.discountPrice ? (item.price || 0) - item.discountPrice : 0;
+    const hasDiscount = item.discountPrice && item.discountPrice < (item.price || 0);
 
     return (
       <TouchableOpacity
@@ -283,17 +322,24 @@ const DashboardScreen = () => {
             {item.category}
           </Text>
           <View style={styles.priceContainer}>
-            {hasDiscount ? (
-              <>
-                <Text style={styles.originalPrice}>₹{item.price?.toFixed(2)}</Text>
-                <Text style={styles.price}>₹{item.discountPrice?.toFixed(2)}</Text>
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
-                </View>
-              </>
-            ) : (
-              <Text style={styles.price}>₹{item.price?.toFixed(2)}</Text>
+            <View style={styles.priceDetailsContainer}>
+              <Text style={styles.finalPrice}>₹{priceCalculation.finalPrice.toFixed(2)}</Text>
+              <Text style={styles.finalPriceLabel}>After GST</Text>
+            </View>
+            <View style={styles.gstContainer}>
+              <Text style={styles.gstAmount}>+₹{priceCalculation.gstAmount.toFixed(2)}</Text>
+              <Text style={styles.gstLabel}>{priceCalculation.gstPercentage}% GST</Text>
+            </View>
+            {hasDiscount && (
+              <View style={styles.discountContainer}>
+                <Text style={styles.discountAmount}>-₹{discountAmount.toFixed(2)}</Text>
+                <Text style={styles.discountLabel}>Discount</Text>
+              </View>
             )}
+            <View style={styles.basePriceContainer}>
+              <Text style={styles.basePrice}>₹{item.price?.toFixed(2)}</Text>
+              <Text style={styles.basePriceLabel}>Base</Text>
+            </View>
           </View>
         </View>
       </TouchableOpacity>
