@@ -375,6 +375,17 @@ class DatabaseService {
       throw error;
     }
   }
+
+  async executeSql(sql: string, params?: any[]): Promise<any> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+    try {
+      return await this.database.executeSql(sql, params || []);
+    } catch (error) {
+      console.error('Error executing SQL:', error);
+      throw error;
+    }
+  }
 }
 
 export default new DatabaseService();

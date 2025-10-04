@@ -51,7 +51,7 @@ const AddItemScreen = () => {
         let categoriesList = await DatabaseService.getAllCategories();
 
         if (categoriesList.length === 0) {
-          // If no categories exist, initialize with defaults and reload
+          // If no categories exist, initialize with only "Others" and reload
           await initializeDefaultCategories();
           categoriesList = await DatabaseService.getAllCategories();
         }
@@ -70,9 +70,9 @@ const AddItemScreen = () => {
       } catch (error) {
         console.error('Error loading categories:', error);
         Alert.alert('Error', 'Failed to load categories');
-        // Fallback to basic categories if database fails
-        setCategories(['Electronics', 'Clothing', 'Home & Kitchen', 'Books', 'Other']);
-        setCategory('Electronics');
+        // Fallback to only "Others" category if database fails
+        setCategories(['Others']);
+        setCategory('Others');
       } finally {
         setLoadingCategories(false);
       }
@@ -83,23 +83,15 @@ const AddItemScreen = () => {
 
   const initializeDefaultCategories = async () => {
     try {
-      const defaultCategories = [
-        'Electronics',
-        'Clothing',
-        'Home & Kitchen',
-        'Books',
-        'Toys & Games',
-        'Beauty & Personal Care',
-        'Sports & Outdoors',
-        'Automotive',
-        'Office Supplies',
-        'Other',
-      ];
+      // Check if "Others" category already exists
+      const existingCategories = await DatabaseService.getAllCategories();
+      const othersExists = existingCategories.some(cat => cat.name.toLowerCase() === 'others');
 
-      for (const categoryName of defaultCategories) {
-        await DatabaseService.addCategory({ name: categoryName });
+      if (!othersExists) {
+        // Only create the 'Others' category as the single default category
+        await DatabaseService.addCategory({ name: 'Others' });
+        console.log('Default "Others" category initialized in AddItemScreen');
       }
-      console.log('Default categories initialized in AddItemScreen');
     } catch (error) {
       console.error('Error initializing default categories:', error);
     }

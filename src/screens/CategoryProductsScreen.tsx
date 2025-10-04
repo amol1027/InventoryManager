@@ -12,15 +12,16 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-import { RootDrawerParamList } from '../navigation/AppNavigator';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
+import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
 
-type CategoryProductsScreenNavigationProp = DrawerNavigationProp<RootDrawerParamList, 'CategoryProducts'>;
-type CategoryProductsScreenRouteProp = RouteProp<RootDrawerParamList, 'CategoryProducts'>;
+type CategoryProductsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'CategoryProducts'>;
+type CategoryProductsScreenRouteProp = RouteProp<RootStackParamList, 'CategoryProducts'>;
 
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
@@ -186,6 +187,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  finalPriceContainer: {
+    backgroundColor: colors.success + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  finalPriceLabel: {
+    color: colors.success,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   loader: {
     flex: 1,
     justifyContent: 'center',
@@ -269,19 +282,20 @@ const CategoryProductsScreen = () => {
   };
 
   const renderItem = ({ item }: { item: Product }) => {
-    const discountPercentage = item.discountPrice
-      ? Math.round(((item.price - item.discountPrice) / item.price) * 100)
-      : 0;
+    const discountPercentage = calculateDiscountPercentage(item.price, item.discountPrice || item.price);
+    const priceCalculation = calculateFinalPrice(item.price, item.discountPrice, item.gstSlab || 0);
 
     return (
       <TouchableOpacity
         style={styles.productCard}
         onPress={() => {
-          // Navigate to MainStack first, then to ProductDetail
-          navigation.navigate('MainStack');
-          // Note: ProductDetail navigation will need to be handled differently
-          // For now, let's just navigate to MainStack and show an alert
-          Alert.alert('Navigation', 'Product detail view will be implemented');
+          try {
+            // Navigate to ProductDetail screen within the same stack
+            navigation.navigate('ProductDetail', { productId: item.id! });
+          } catch (error) {
+            console.error('Error navigating to product detail:', error);
+            Alert.alert('Error', 'Failed to open product details');
+          }
         }}
       >
         {item.imageUri && (
@@ -322,6 +336,11 @@ const CategoryProductsScreen = () => {
             ) : (
               <Text style={styles.price}>₹{item.price.toFixed(2)}</Text>
             )}
+            <View style={[styles.finalPriceContainer, { backgroundColor: colors.success + '20' }]}>
+              <Text style={[styles.finalPriceLabel, { color: colors.success }]}>
+                Final: {formatPrice(priceCalculation.finalPrice)}
+              </Text>
+            </View>
           </View>
         </View>
         <Icon name="chevron-right" size={24} color={colors.text.secondary} />

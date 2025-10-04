@@ -10,8 +10,7 @@ const AboutScreen = () => {
     name: 'Inventory Manager',
     version: '1.2.1',
     build: '2025.10.3',
-    developer: 'Amol Solase', // Replace with actual developer name
-    description: 'A comprehensive inventory management application built with React Native and SQLite for efficient business inventory tracking.',
+    developer: 'Amol Solase', 
   };
 
   return (
@@ -44,7 +43,7 @@ const AboutScreen = () => {
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>© 2025 {appInfo.name}</Text>
-        <Text style={styles.footerText}>All Rights Reserved</Text>
+       
         <Text style={styles.footerText}>Made with ❤️ by {appInfo.developer}</Text>
       </View>
     </ScrollView>

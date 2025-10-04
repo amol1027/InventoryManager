@@ -76,23 +76,9 @@ const CategoriesScreen = () => {
       const existingCategories = await DatabaseService.getAllCategories();
 
       if (existingCategories.length === 0) {
-        const defaultCategories = [
-          'Electronics',
-          'Clothing',
-          'Home & Kitchen',
-          'Books',
-          'Toys & Games',
-          'Beauty & Personal Care',
-          'Sports & Outdoors',
-          'Automotive',
-          'Office Supplies',
-          'Other',
-        ];
-
-        for (const categoryName of defaultCategories) {
-          await DatabaseService.addCategory({ name: categoryName });
-        }
-        console.log('Default categories initialized');
+        // Only create the 'Others' category as the single default category
+        await DatabaseService.addCategory({ name: 'Others' });
+        console.log('Default "Others" category initialized');
       }
     } catch (error) {
       console.error('Error initializing default categories:', error);
@@ -133,41 +119,123 @@ const CategoriesScreen = () => {
     }
   };
 
-  const renderCategoryItem = ({ item }: { item: CategoryWithCount }) => (
-    <TouchableOpacity
-      style={styles.categoryItem}
-      onPress={() => {
-        try {
-          console.log('Navigating to CategoryProducts with category:', item.name);
-          navigation.navigate('CategoryProducts', { categoryName: item.name });
-        } catch (error) {
-          ErrorHandler.handle(error as Error, 'CategoriesScreen.renderCategoryItem', true);
-        }
-      }}
-    >
-      <View style={styles.categoryInfo}>
-        <Text style={styles.categoryName}>{item.name}</Text>
-        <Text style={styles.categoryCount}>{item.count} products</Text>
-      </View>
-      <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-        <Text style={styles.countText}>{item.count}</Text>
-      </View>
-      <Icon name="chevron-right" size={24} color={colors.text.secondary} />
-    </TouchableOpacity>
-  );
+  const ensureOthersCategoryExists = async (): Promise<number> => {
+    // Check if 'Others' category exists
+    const allCategories = await DatabaseService.getAllCategories();
+    const othersCategory = allCategories.find((cat: { name: string; }) => cat.name.toLowerCase() === 'others');
+    
+    if (othersCategory) {
+      return othersCategory.id!;
+    }
+    
+    // Create 'Others' category if it doesn't exist
+    const newCategoryId = await DatabaseService.addCategory({ name: 'Others' });
+    return newCategoryId;
+  };
 
-  const predefinedCategories = [
-    'Electronics',
-    'Clothing',
-    'Home & Kitchen',
-    'Books',
-    'Toys & Games',
-    'Beauty & Personal Care',
-    'Sports & Outdoors',
-    'Automotive',
-    'Office Supplies',
-    'Other',
-  ];
+  const handleDeleteCategory = (category: CategoryWithCount) => {
+    if (category.count > 0) {
+      // If category has products, ask if user wants to move them to 'Others' category
+      Alert.alert(
+        'Category Contains Products',
+        `"${category.name}" contains ${category.count} product(s). Move these products to 'Others' category and delete?`,
+        [
+          { 
+            text: 'Cancel', 
+            style: 'cancel' 
+          },
+          { 
+            text: 'Move & Delete',
+            onPress: async () => {
+              try {
+                const othersCategoryId = await ensureOthersCategoryExists();
+                
+                // Move all products to 'Others' category
+                await DatabaseService.executeSql(
+                  'UPDATE products SET category = ? WHERE category = ?',
+                  ['Others', category.name]
+                );
+                
+                // Now delete the category
+                await DatabaseService.deleteCategory(category.id!);
+                
+                // Refresh the categories list
+                const updatedCategories = await DatabaseService.getCategoriesWithProductCount();
+                setCategories(updatedCategories);
+                setFilteredCategories(updatedCategories);
+                
+                Alert.alert('Success', `Moved ${category.count} product(s) to 'Others' and deleted category.`);
+              } catch (error) {
+                ErrorHandler.handle(
+                  DatabaseErrorHandler.createDatabaseError('Failed to move products and delete category', error as Error),
+                  'CategoriesScreen.handleDeleteCategory'
+                );
+              }
+            } 
+          }
+        ]
+      );
+      return;
+    }
+
+    // If category is empty, proceed with direct deletion
+    ConfirmationDialog.show(
+      {
+        title: 'Delete Category',
+        message: `Are you sure you want to delete the category "${category.name}"?`,
+        confirmText: 'Delete',
+      },
+      async () => {
+        try {
+          await DatabaseService.deleteCategory(category.id!);
+          const updatedCategories = await DatabaseService.getCategoriesWithProductCount();
+          setCategories(updatedCategories);
+          setFilteredCategories(updatedCategories);
+          Alert.alert('Success', 'Category deleted successfully');
+        } catch (error) {
+          ErrorHandler.handle(
+            DatabaseErrorHandler.createDatabaseError('Failed to delete category', error as Error),
+            'CategoriesScreen.handleDeleteCategory'
+          );
+        }
+      }
+    );
+  };
+
+  const renderCategoryItem = ({ item }: { item: CategoryWithCount }) => (
+    <View style={styles.categoryItem}>
+      <TouchableOpacity
+        style={styles.categoryContent}
+        onPress={() => {
+          try {
+            console.log('Navigating to CategoryProducts with category:', item.name);
+            navigation.navigate('MainStack', {
+              screen: 'CategoryProducts',
+              params: { categoryName: item.name }
+            } as never);
+          } catch (error) {
+            ErrorHandler.handle(error as Error, 'CategoriesScreen.renderCategoryItem', true);
+          }
+        }}
+      >
+        <View style={styles.categoryInfo}>
+          <Text style={styles.categoryName}>{item.name}</Text>
+          <Text style={styles.categoryCount}>{item.count} products</Text>
+        </View>
+        <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+          <Text style={styles.countText}>{item.count}</Text>
+        </View>
+        <Icon name="chevron-right" size={24} color={colors.text.secondary} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDeleteCategory(item)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Icon name="delete" size={22} color={colors.error} />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -265,38 +333,6 @@ const CategoriesScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.predefinedTitle}>Predefined Categories:</Text>
-            <View style={styles.predefinedContainer}>
-              {predefinedCategories.map((category) => {
-                const isAlreadyUsed = categories.some(cat => cat.name === category);
-                const isSelected = newCategoryName === category;
-
-                return (
-                  <TouchableOpacity
-                    key={category}
-                    style={[
-                      styles.predefinedItem,
-                      isAlreadyUsed && styles.usedCategory,
-                      isSelected && styles.selectedCategory
-                    ]}
-                    onPress={() => {
-                      if (!isAlreadyUsed) {
-                        setNewCategoryName(category);
-                      }
-                    }}
-                    disabled={isAlreadyUsed}
-                  >
-                    <Text style={[
-                      styles.predefinedText,
-                      isAlreadyUsed && styles.usedCategoryText,
-                      isSelected && styles.selectedCategoryText
-                    ]}>
-                      {category}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
           </View>
         </View>
       </Modal>
@@ -386,12 +422,25 @@ const getStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    marginVertical: 4,
     backgroundColor: colors.surface,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
+    marginVertical: 4,
+    overflow: 'hidden',
+  },
+  categoryContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  deleteButton: {
+    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
   },
   categoryInfo: {
     flex: 1,
@@ -475,45 +524,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.text.inverse,
     textAlign: 'center',
     fontSize: 16,
-    fontWeight: '500',
-  },
-  predefinedTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 12,
-  },
-  predefinedContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  predefinedItem: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    margin: 4,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  usedCategory: {
-    backgroundColor: colors.primary + '20',
-    borderColor: colors.primary,
-  },
-  selectedCategory: {
-    backgroundColor: colors.secondary + '20',
-    borderColor: colors.secondary,
-  },
-  predefinedText: {
-    fontSize: 14,
-    color: colors.text.primary,
-  },
-  usedCategoryText: {
-    color: colors.primary,
-    fontWeight: '500',
-  },
-  selectedCategoryText: {
-    color: colors.secondary,
     fontWeight: '500',
   },
 });

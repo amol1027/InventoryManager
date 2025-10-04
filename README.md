@@ -12,6 +12,13 @@ A comprehensive inventory management application built with React Native and SQL
 - **Inventory Tracking**: Real-time quantity management with stock status indicators
 - **Smart Search & Filter**: Quickly find products with search and filtering options
 
+### 💰 Complete Price Transparency
+- **Final Price Display**: Shows the total amount customers pay after GST
+- **GST Breakdown**: Displays GST amount and percentage separately
+- **Discount Information**: Shows discount amount and savings when applicable
+- **Base Price Reference**: Original price shown with strikethrough for comparison
+- **Real-time Calculations**: All price components update automatically
+
 ### Advanced Features
 - **Stock Status Indicators**:
   - 🟢 In Stock (>10 units)
@@ -25,13 +32,11 @@ A comprehensive inventory management application built with React Native and SQL
 - **Theme Support**: Dark/light theme toggle for user preference
 - **Category Management**: Dedicated screen for viewing and managing product categories
 
-### User Interface
-- **Modern Design**: Clean, professional interface with intuitive navigation
-- **Responsive Layout**: Optimized for various device sizes and orientations
-- **Drawer Navigation**: Easy access to all app features via slide-out menu
-- **Real-time Validation**: Form validation with helpful error messages
-- **Visual Feedback**: Loading states, success messages, and error handling
-- **Interactive Elements**: Touch-friendly buttons, cards, and navigation
+### Navigation Flow
+- **Categories Screen**: Browse and manage product categories
+- **Category Products Screen**: View all products within a specific category
+- **Product Detail Screen**: Comprehensive view of individual product with full price breakdown
+- **Seamless Back Navigation**: Proper back button behavior throughout the app
 
 ## 📱 Screens
 
@@ -39,6 +44,7 @@ A comprehensive inventory management application built with React Native and SQL
 - **Add Item**: Comprehensive form to add new products with validation
 - **Product Detail**: View and edit complete product information with GST and quantity management
 - **Categories**: Dedicated screen for viewing and managing product categories with product counts
+- **Category Products**: Browse products within a specific category with search functionality
 - **Theme Settings**: Dark/light theme toggle with live preview and customization options
 - **About**: Comprehensive app information including version, developer details, and feature overview
 
@@ -51,7 +57,7 @@ src/
 ├── navigation/       # Navigation configuration (AppNavigator, CustomDrawerContent)
 ├── screens/          # Application screens (Dashboard, AddItem, ProductDetail, etc.)
 ├── theme/            # UI theme definitions (colors, styles)
-└── utils/            # Utility functions
+└── utils/            # Utility functions (PriceCalculator, ErrorHandler, etc.)
 ```
 
 ## 🛠️ Technology Stack
@@ -158,6 +164,13 @@ CREATE TABLE products (
 - **Image Integration**: Capture or select product images
 - **Validation**: Comprehensive form validation with user-friendly error messages
 
+### Complete Price Transparency System
+- **Final Price Calculation**: Automatically calculates total price after GST
+- **GST Information Display**: Shows GST amount and percentage separately
+- **Discount Integration**: Displays discount amount and savings percentage
+- **Base Price Reference**: Shows original price for comparison
+- **Real-time Updates**: All price components update when any value changes
+
 ### GST Support
 - **Multiple GST Slabs**: Support for standard Indian GST rates (0%, 5%, 12%, 18%, 28%)
 - **Automatic Calculations**: GST information stored and displayed with products
@@ -168,6 +181,12 @@ CREATE TABLE products (
 - **Stock Alerts**: Visual indicators for stock status
 - **Low Stock Warnings**: Automatic alerts for items running low
 - **Inventory Overview**: Dashboard view of all inventory levels
+
+### Enhanced Navigation System
+- **Categories → CategoryProducts → ProductDetail**: Complete navigation flow
+- **Proper Back Button Behavior**: Each screen navigates back correctly
+- **Drawer Navigation**: Easy access to main app sections
+- **Stack Navigation**: Seamless navigation within related screens
 
 ### Search & Navigation
 - **Real-time Search**: Instant search across product names, categories, and descriptions
@@ -183,6 +202,7 @@ CREATE TABLE products (
 - **Responsive Layout**: Works on phones and tablets
 - **Accessibility**: Proper contrast ratios and touch targets
 - **Loading States**: Visual feedback during data operations
+- **Interactive Elements**: Touch-friendly buttons, cards, and navigation
 
 ## 🔒 Data Management
 
