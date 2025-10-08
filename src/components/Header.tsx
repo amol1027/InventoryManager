@@ -58,7 +58,14 @@ const Header: React.FC<HeaderProps> = ({
         {showMenuButton && !showBackButton && (
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => navigation.dispatch(DrawerActions.toggleDrawer())}
+            onPress={() => {
+              try {
+                // For drawer navigation, direct dispatch should work
+                navigation.dispatch(DrawerActions.toggleDrawer());
+              } catch (error) {
+                console.error('Error toggling drawer:', error);
+              }
+            }}
           >
             <Icon name="menu" size={24} color={colors.text.primary} />
           </TouchableOpacity>

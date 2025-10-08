@@ -66,8 +66,8 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
       {/* App Header */}
       <View style={styles.header}>
         <Icon name="inventory" size={32} color={colors.primary} />
-        <Text style={styles.appName}>Inventory Manager</Text>
-        <Text style={styles.version}>v1.0.0</Text>
+        <Text style={styles.appName}>Vinayak Agencies</Text>
+        <Text style={styles.version}>v1.2.4</Text>
       </View>
 
       {/* Drawer Items */}
@@ -90,7 +90,11 @@ const CustomDrawerContent: React.FC<DrawerContentComponentProps> = (props) => {
                   });
                 } else {
                   // For other screens, navigate normally
-                  navigation.navigate(item.screen as never);
+                  try {
+                    navigation.navigate(item.screen as never);
+                  } catch (error) {
+                    console.error('Error navigating from drawer:', error);
+                  }
                 }
               }}
             >

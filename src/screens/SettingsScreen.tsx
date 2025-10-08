@@ -1,29 +1,50 @@
-import React from 'react';
-import { View, Text, Switch } from 'react-native';
+import React, { useLayoutEffect } from 'react';
+import { View, Text, Switch, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../theme/ThemeContext';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 
 const SettingsScreen = () => {
   const { theme, colors, toggleTheme } = useTheme();
+  const navigation = useNavigation();
   const isDarkMode = theme === 'dark';
+
+  useLayoutEffect(() => {
+    (navigation as any).setOptions({
+      title: 'Settings',
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              // Try multiple methods to access drawer
+              const parent = (navigation as any).getParent?.();
+              if (parent?.dispatch) {
+                parent.dispatch(DrawerActions.toggleDrawer());
+              } else if ((navigation as any).dispatch) {
+                (navigation as any).dispatch(DrawerActions.toggleDrawer());
+              } else {
+                // Fallback: try to access drawer through root navigation
+                const root = (navigation as any).getRootState?.();
+                if (root?.routes?.[0]?.state) {
+                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
+                }
+              }
+            } catch (error) {
+              console.error('Error toggling drawer:', error);
+            }
+          }}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="menu" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.text.inverse]);
 
   const dynamicStyles = {
     container: {
       flex: 1,
       backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      padding: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: 'bold' as const,
-      color: colors.text.primary,
-      marginLeft: 12,
     },
     content: {
       flex: 1,
@@ -107,10 +128,7 @@ const SettingsScreen = () => {
 
   return (
     <View style={dynamicStyles.container}>
-      <View style={dynamicStyles.header}>
-        <Icon name="brightness-6" size={28} color={colors.primary} />
-        <Text style={dynamicStyles.title}>Theme Settings</Text>
-      </View>
+      {/* Header handled by native navigation */}
 
       <View style={dynamicStyles.content}>
         <View style={dynamicStyles.themeOption}>
