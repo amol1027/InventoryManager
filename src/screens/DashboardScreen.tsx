@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useCallback, useLayoutEffect, useEffect } from 'react';
 import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import {
@@ -12,13 +12,14 @@ import {
   Alert,
   Image,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
-import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
+import ProductCard from '../components/ProductCard';
 
 type DashboardScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Dashboard'>;
 type SortOption = 'category' | 'nameAsc' | 'nameDesc' | 'priceAsc' | 'priceDesc' | 'discount';
@@ -107,102 +108,6 @@ const getStyles = (colors: any) => StyleSheet.create({
   listContainer: {
     padding: 16,
   },
-  productItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 8,
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  productImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  productCategory: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.primary,
-  },
-  priceDetailsContainer: {
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  finalPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.success,
-  },
-  finalPriceLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  gstContainer: {
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  gstAmount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.secondary,
-  },
-  gstLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  discountContainer: {
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  discountAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.accent,
-  },
-  discountLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  basePriceContainer: {
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  basePrice: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textDecorationLine: 'line-through',
-  },
-  basePriceLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -263,7 +168,13 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     elevation: 4,
   },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
 });
+
+const PAGE_SIZE = 20;
 
 const DashboardScreen = () => {
   const navigation = useNavigation<DashboardScreenNavigationProp>();
@@ -273,6 +184,10 @@ const DashboardScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<ExtendedProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const [sortOption, setSortOption] = useState<SortOption>('nameAsc');
   const [showSortOptions, setShowSortOptions] = useState(false);
 
@@ -317,12 +232,45 @@ const DashboardScreen = () => {
     });
   }, [navigation, colors.text.inverse]);
 
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(async (reset: boolean = false) => {
     try {
-      setLoading(true);
-      const allProducts = await DatabaseService.getAllProducts();
-      let sortedProducts = [...allProducts];
+      if (reset) {
+        setLoading(true);
+        setPage(0);
+      } else {
+        setLoadingMore(true);
+      }
 
+      const currentPage = reset ? 0 : page;
+      const offset = currentPage * PAGE_SIZE;
+
+      let newProducts: ExtendedProduct[] = [];
+
+      if (searchQuery) {
+        // If searching, we currently don't support pagination in the search query itself efficiently without more complex SQL
+        // For now, we'll stick to the existing search behavior but maybe we should optimize it later
+        // Or we can fetch all and filter client side if the dataset isn't HUGE, but the goal is performance.
+        // Let's use the searchProducts method which returns all matches for now.
+        // TODO: Implement paginated search in DatabaseService
+        newProducts = await DatabaseService.searchProducts(searchQuery);
+        setHasMore(false); // Disable pagination for search results for now
+      } else {
+        newProducts = await DatabaseService.getProducts(PAGE_SIZE, offset);
+
+        // Check if we have more products
+        if (newProducts.length < PAGE_SIZE) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+      }
+
+      // Apply sorting
+      // Note: Sorting is currently done client-side after fetching a page. 
+      // For true server-side sorting with pagination, we'd need to pass sort options to the SQL query.
+      // For this implementation, we'll sort the fetched page, which is an approximation.
+      // Ideally, we should update DatabaseService to accept sort parameters.
+      let sortedProducts = [...newProducts];
       switch (sortOption) {
         case 'nameAsc':
           sortedProducts.sort((a, b) => a.name.localeCompare(b.name));
@@ -344,37 +292,48 @@ const DashboardScreen = () => {
           break;
       }
 
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        sortedProducts = sortedProducts.filter(
-          p =>
-            p.name.toLowerCase().includes(query) ||
-            (p.details || '').toLowerCase().includes(query) ||
-            p.category.toLowerCase().includes(query)
-        );
+      if (reset) {
+        setProducts(sortedProducts);
+      } else {
+        setProducts(prev => [...prev, ...sortedProducts]);
       }
 
-      setProducts(sortedProducts);
+      if (!reset) {
+        setPage(prev => prev + 1);
+      } else {
+        setPage(1); // Next page will be 1
+      }
+
     } catch (error) {
       console.error('Error loading products:', error);
       Alert.alert('Error', 'Failed to load products');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
     }
-  }, [searchQuery, sortOption]);
+  }, [searchQuery, sortOption, page]);
 
+  // Initial load
   useFocusEffect(
     useCallback(() => {
-      loadProducts();
-    }, [loadProducts])
+      loadProducts(true);
+    }, [searchQuery, sortOption]) // Reload when search or sort changes
   );
+
+  const handleLoadMore = () => {
+    if (!loadingMore && !loading && hasMore && !searchQuery) {
+      loadProducts(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadProducts(true);
+  };
 
   const handleAddPress = () => {
     navigation.navigate('AddItem');
-  };
-
-  const handleCategoriesPress = () => {
-    (navigation as any).getParent()?.navigate('Categories');
   };
 
   const handleProductPress = (product: ExtendedProduct) => {
@@ -385,57 +344,22 @@ const DashboardScreen = () => {
     }
   };
 
-  const renderProductItem = ({ item }: { item: ExtendedProduct }) => {
-    // Calculate prices
-    const priceCalculation = calculateFinalPrice(item.price || 0, item.discountPrice, item.gstSlab || 0);
-    const discountAmount = item.discountPrice ? (item.price || 0) - item.discountPrice : 0;
-    const hasDiscount = item.discountPrice && item.discountPrice < (item.price || 0);
-
+  const renderProductItem = ({ item, index }: { item: ExtendedProduct; index: number }) => {
     return (
-      <TouchableOpacity
-        style={styles.productItem}
+      <ProductCard
+        product={item}
         onPress={() => handleProductPress(item)}
-      >
-        {item.imageUri ? (
-          <Image
-            source={{ uri: item.imageUri }}
-            style={styles.productImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.productImage, { backgroundColor: colors.background }]}>
-            <Icon name="image" size={30} color={colors.text.secondary} />
-          </View>
-        )}
-        <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={styles.productCategory} numberOfLines={1}>
-            {item.category}
-          </Text>
-          <View style={styles.priceContainer}>
-            <View style={styles.priceDetailsContainer}>
-              <Text style={styles.finalPrice}>₹{priceCalculation.finalPrice.toFixed(2)}</Text>
-              <Text style={styles.finalPriceLabel}>After GST</Text>
-            </View>
-            <View style={styles.gstContainer}>
-              <Text style={styles.gstAmount}>+₹{priceCalculation.gstAmount.toFixed(2)}</Text>
-              <Text style={styles.gstLabel}>{priceCalculation.gstPercentage}% GST</Text>
-            </View>
-            {hasDiscount && (
-              <View style={styles.discountContainer}>
-                <Text style={styles.discountAmount}>-₹{discountAmount.toFixed(2)}</Text>
-                <Text style={styles.discountLabel}>Discount</Text>
-              </View>
-            )}
-            <View style={styles.basePriceContainer}>
-              <Text style={styles.basePrice}>₹{item.price?.toFixed(2)}</Text>
-              <Text style={styles.basePriceLabel}>Base</Text>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
+        index={index}
+      />
+    );
+  };
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={colors.primary} />
+      </View>
     );
   };
 
@@ -514,6 +438,12 @@ const DashboardScreen = () => {
           keyExtractor={(item) => item.id?.toString() || `product-${item.name}-${item.price}`}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={renderEmptyComponent}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
+          }
         />
       )}
 

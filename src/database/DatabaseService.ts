@@ -38,7 +38,7 @@ class DatabaseService {
         name: 'inventoryManager.db',
         location: 'default',
       });
-      
+
       await this.createTables();
       await this.migrateDatabase();
       this.initialized = true;
@@ -100,7 +100,7 @@ class DatabaseService {
       let hasImageUri = false;
       let hasGstSlab = false;
       let hasQuantity = false;
-      
+
       for (let i = 0; i < result.rows.length; i++) {
         const column = result.rows.item(i);
         if (column.name === 'imageUri') {
@@ -134,6 +134,16 @@ class DatabaseService {
         );
         console.log('Added quantity column to products table');
       }
+
+      // Add indices for performance
+      await this.database.executeSql(
+        "CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);"
+      );
+      await this.database.executeSql(
+        "CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);"
+      );
+      console.log('Database indices checked/created');
+
     } catch (error) {
       console.error('Error migrating database:', error);
       throw error;
@@ -217,7 +227,7 @@ class DatabaseService {
     if (!this.database) throw new Error('Database not initialized');
 
     try {
-      const [result] = await this.database.executeSql('SELECT * FROM products');
+      const [result] = await this.database.executeSql('SELECT * FROM products ORDER BY updatedAt DESC');
       const products: Product[] = [];
 
       for (let i = 0; i < result.rows.length; i++) {
@@ -231,6 +241,44 @@ class DatabaseService {
     }
   }
 
+  async getProducts(limit: number = 20, offset: number = 0): Promise<Product[]> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [result] = await this.database.executeSql(
+        'SELECT * FROM products ORDER BY updatedAt DESC LIMIT ? OFFSET ?',
+        [limit, offset]
+      );
+      const products: Product[] = [];
+
+      for (let i = 0; i < result.rows.length; i++) {
+        products.push(result.rows.item(i));
+      }
+
+      return products;
+    } catch (error) {
+      console.error('Error getting products with pagination:', error);
+      throw error;
+    }
+  }
+
+  async getTotalProductCount(): Promise<number> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [result] = await this.database.executeSql('SELECT COUNT(*) as count FROM products');
+      if (result.rows.length > 0) {
+        return result.rows.item(0).count;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error getting total product count:', error);
+      throw error;
+    }
+  }
+
   async searchProducts(query: string): Promise<Product[]> {
     if (!this.database) await this.initDatabase();
     if (!this.database) throw new Error('Database not initialized');
@@ -238,7 +286,7 @@ class DatabaseService {
     try {
       const searchQuery = `%${query}%`;
       const [result] = await this.database.executeSql(
-        'SELECT * FROM products WHERE name LIKE ? OR category LIKE ? OR details LIKE ?',
+        'SELECT * FROM products WHERE name LIKE ? OR category LIKE ? OR details LIKE ? ORDER BY updatedAt DESC',
         [searchQuery, searchQuery, searchQuery]
       );
 
