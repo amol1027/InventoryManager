@@ -1,17 +1,52 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useLayoutEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const AboutScreen = () => {
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const styles = getStyles(colors);
 
   const appInfo = {
-    name: 'Inventory Manager',
+    name: 'Vinayak Agencies',
     version: '1.2.1',
     build: '2025.10.3',
     developer: 'Amol Solase', 
   };
+
+  useLayoutEffect(() => {
+    (navigation as any).setOptions({
+      title: 'About',
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              // Try multiple methods to access drawer
+              const parent = (navigation as any).getParent?.();
+              if (parent?.dispatch) {
+                parent.dispatch(DrawerActions.toggleDrawer());
+              } else if ((navigation as any).dispatch) {
+                (navigation as any).dispatch(DrawerActions.toggleDrawer());
+              } else {
+                // Fallback: try to access drawer through root navigation
+                const root = (navigation as any).getRootState?.();
+                if (root?.routes?.[0]?.state) {
+                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
+                }
+              }
+            } catch (error) {
+              console.error('Error toggling drawer:', error);
+            }
+          }}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="menu" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.text.inverse]);
 
   return (
     <ScrollView style={styles.content}>

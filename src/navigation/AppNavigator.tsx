@@ -103,11 +103,19 @@ const CustomHeader = ({ navigation, route, options }: { navigation: any; route: 
 };
 
 const MainStack = () => {
+  const { colors } = useTheme();
   return (
     <ErrorBoundary>
       <Stack.Navigator
         screenOptions={{
-          header: (props) => <CustomHeader {...props} />,
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: colors.primary,
+          },
+          headerTintColor: colors.text.inverse,
+          headerTitleStyle: {
+            fontWeight: 'bold' as const,
+          },
         }}
       >
         <Stack.Screen
@@ -139,7 +147,7 @@ const MainStack = () => {
           component={ProductDetailScreen}
           options={{
             title: 'Product Details',
-            headerShown: true,
+            headerShown: false,
           }}
         />
       </Stack.Navigator>
@@ -149,20 +157,6 @@ const MainStack = () => {
 
 const AppNavigator = () => {
   const { colors } = useTheme();
-  const commonScreenOptions = {
-    header: (props: any) => <CustomHeader {...props} />,
-    headerShown: true,
-    headerStyle: {
-      backgroundColor: colors.primary,
-      elevation: 0,
-      shadowOpacity: 0,
-    },
-    headerTintColor: colors.text.inverse,
-    headerTitleStyle: {
-      fontWeight: 'bold' as const,
-    },
-    headerLeft: () => null, // Hide default back button
-  };
 
   return (
     <ErrorBoundary>
@@ -170,11 +164,18 @@ const AppNavigator = () => {
         initialRouteName="MainStack"
         drawerContent={(props) => <CustomDrawerContent {...props} />}
         screenOptions={{
-          ...commonScreenOptions,
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: colors.primary,
+          },
+          headerTintColor: colors.text.inverse,
+          headerTitleStyle: {
+            fontWeight: 'bold' as const,
+          },
           drawerActiveTintColor: colors.primary,
           drawerInactiveTintColor: colors.text.secondary,
           drawerStyle: {
-            backgroundColor: colors.background,
+            backgroundColor: colors.surface,
             width: 280,
           },
           swipeEnabled: true,
@@ -187,7 +188,7 @@ const AppNavigator = () => {
           options={{
             drawerLabel: 'Home',
             title: 'Dashboard',
-            headerShown: false,
+            headerShown: false, // MainStack handles its own header
           }}
         />
         <Drawer.Screen

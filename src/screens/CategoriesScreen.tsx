@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { RootDrawerParamList } from '../navigation/AppNavigator';
@@ -38,6 +38,47 @@ const CategoriesScreen = () => {
   useEffect(() => {
     loadCategories();
   }, []);
+
+  // Configure native header
+  useLayoutEffect(() => {
+    (navigation as any).setOptions({
+      title: 'Categories',
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              // Try multiple methods to access drawer
+              const parent = (navigation as any).getParent?.();
+              if (parent?.dispatch) {
+                parent.dispatch(DrawerActions.toggleDrawer());
+              } else if ((navigation as any).dispatch) {
+                (navigation as any).dispatch(DrawerActions.toggleDrawer());
+              } else {
+                // Fallback: try to access drawer through root navigation
+                const root = (navigation as any).getRootState?.();
+                if (root?.routes?.[0]?.state) {
+                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
+                }
+              }
+            } catch (error) {
+              console.error('Error toggling drawer:', error);
+            }
+          }}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="menu" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setModalVisible(true)}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="add" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.text.inverse]);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
@@ -209,10 +250,14 @@ const CategoriesScreen = () => {
         onPress={() => {
           try {
             console.log('Navigating to CategoryProducts with category:', item.name);
-            navigation.navigate('MainStack', {
-              screen: 'CategoryProducts',
-              params: { categoryName: item.name }
-            } as never);
+            // Close drawer first, then navigate to MainStack, then to CategoryProducts
+            navigation.closeDrawer();
+            setTimeout(() => {
+              (navigation as any).navigate('MainStack', {
+                screen: 'CategoryProducts',
+                params: { categoryName: item.name }
+              });
+            }, 100);
           } catch (error) {
             ErrorHandler.handle(error as Error, 'CategoriesScreen.renderCategoryItem', true);
           }
@@ -239,15 +284,7 @@ const CategoriesScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Categories</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Icon name="add" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      </View>
+      {/* Header handled by native navigation */}
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>

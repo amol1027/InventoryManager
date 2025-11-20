@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback, useLayoutEffect } from 'react';
+import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import {
   View,
@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
@@ -32,6 +33,53 @@ const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  header: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(91, 141, 239, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(91, 141, 239, 0.25)',
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 4,
+    letterSpacing: -0.5,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -198,7 +246,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.text.primary,
   },
   sortOptionSelected: {
-    backgroundColor: `${colors.primary}20`,
+    backgroundColor: 'rgba(91, 141, 239, 0.2)',
   },
   sortOptionSelectedText: {
     color: colors.primary,
@@ -227,6 +275,47 @@ const DashboardScreen = () => {
   const [loading, setLoading] = useState(true);
   const [sortOption, setSortOption] = useState<SortOption>('nameAsc');
   const [showSortOptions, setShowSortOptions] = useState(false);
+
+  // Configure native header
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: 'Dashboard',
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              // Try multiple methods to access drawer
+              const parent = (navigation as any).getParent?.();
+              if (parent?.dispatch) {
+                parent.dispatch(DrawerActions.toggleDrawer());
+              } else if ((navigation as any).dispatch) {
+                (navigation as any).dispatch(DrawerActions.toggleDrawer());
+              } else {
+                // Fallback: try to access drawer through root navigation
+                const root = (navigation as any).getRootState?.();
+                if (root?.routes?.[0]?.state) {
+                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
+                }
+              }
+            } catch (error) {
+              console.error('Error toggling drawer:', error);
+            }
+          }}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="menu" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setShowSortOptions((prev) => !prev)}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="sort" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.text.inverse]);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -282,6 +371,10 @@ const DashboardScreen = () => {
 
   const handleAddPress = () => {
     navigation.navigate('AddItem');
+  };
+
+  const handleCategoriesPress = () => {
+    (navigation as any).getParent()?.navigate('Categories');
   };
 
   const handleProductPress = (product: ExtendedProduct) => {
@@ -359,6 +452,8 @@ const DashboardScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Header handled by native navigation */}
+
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
@@ -367,22 +462,16 @@ const DashboardScreen = () => {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-        <TouchableOpacity
-          style={styles.sortButton}
-          onPress={() => setShowSortOptions(!showSortOptions)}
-        >
-          <Icon name="sort" size={24} color="#fff" />
-        </TouchableOpacity>
       </View>
 
       {showSortOptions && (
         <View style={styles.sortOptionsContainer}>
           {[
-            { value: 'nameAsc', label: 'Name (A-Z)', icon: 'sort-alphabetical-ascending' },
-            { value: 'nameDesc', label: 'Name (Z-A)', icon: 'sort-alphabetical-descending' },
-            { value: 'priceAsc', label: 'Price (Low to High)', icon: 'sort-numeric-ascending' },
-            { value: 'priceDesc', label: 'Price (High to Low)', icon: 'sort-numeric-descending' },
-            { value: 'discount', label: 'On Sale', icon: 'sale' },
+            { value: 'nameAsc', label: 'Name (A-Z)', icon: 'sort-by-alpha' },
+            { value: 'nameDesc', label: 'Name (Z-A)', icon: 'sort-by-alpha' },
+            { value: 'priceAsc', label: 'Price (Low to High)', icon: 'trending-up' },
+            { value: 'priceDesc', label: 'Price (High to Low)', icon: 'trending-down' },
+            { value: 'discount', label: 'On Sale', icon: 'local-offer' },
             { value: 'category', label: 'Category', icon: 'category' },
           ].map((option) => (
             <TouchableOpacity
