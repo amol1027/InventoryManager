@@ -536,123 +536,217 @@ const CategoryProductsScreen = () => {
   const navigation = useNavigation<CategoryProductsScreenNavigationProp>();
   const route = useRoute<CategoryProductsScreenRouteProp>();
   const { colors } = useTheme();
-  (product.details && product.details.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }
+  const styles = getStyles(colors);
+  const { categoryName } = route.params;
 
-// Apply sorting
-const sorted = [...filtered].sort((a, b) => {
-  let aValue: string | number;
-  let bValue: string | number;
+  const [products, setProducts] = useState<Product[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'quantity'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [showFilters, setShowFilters] = useState(true);
 
-  switch (sortBy) {
-    case 'name':
-      aValue = a.name.toLowerCase();
-      bValue = b.name.toLowerCase();
-      break;
-    case 'price':
-      aValue = a.discountPrice || a.price;
-      bValue = b.discountPrice || b.price;
-      break;
-    case 'quantity':
-      aValue = a.quantity || 0;
-      bValue = b.quantity || 0;
-      break;
-    default:
-      aValue = a.name.toLowerCase();
-      bValue = b.name.toLowerCase();
-  }
+  // Configure native header
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: categoryName,
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              // Try multiple methods to access drawer
+              const parent = (navigation as any).getParent?.();
+              if (parent?.dispatch) {
+                parent.dispatch(DrawerActions.toggleDrawer());
+              } else if ((navigation as any).dispatch) {
+                (navigation as any).dispatch(DrawerActions.toggleDrawer());
+              } else {
+                // Fallback: try to access drawer through root navigation
+                const root = (navigation as any).getRootState?.();
+                if (root?.routes?.[0]?.state) {
+                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
+                }
+              }
+            } catch (error) {
+              console.error('Error toggling drawer:', error);
+            }
+          }}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="menu" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setShowFilters((prev) => !prev)}
+          style={{ paddingHorizontal: 8 }}
+        >
+          <Icon name="tune" size={24} color={colors.text.inverse} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors.text.inverse, categoryName]);
 
-  if (typeof aValue === 'string' && typeof bValue === 'string') {
-    return sortOrder === 'asc'
-      ? aValue.localeCompare(bValue)
-      : bValue.localeCompare(aValue);
-  }
+  const sortedAndFilteredProducts = useMemo(() => {
+    let filtered = products;
 
-  if (typeof aValue === 'number' && typeof bValue === 'number') {
-    return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
-  }
-
-  return 0;
-});
-
-return sorted;
-}, [products, searchQuery, sortBy, sortOrder]);
-
-useFocusEffect(
-  React.useCallback(() => {
-    loadProductsByCategory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryName])
-);
-
-const loadProductsByCategory = async (isRefresh = false) => {
-  try {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = products.filter(
+        (product) =>
+          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (product.details && product.details.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
     }
-    console.log('Loading products for category:', categoryName);
-    await DatabaseService.initDatabase();
-    const allProducts = await DatabaseService.getAllProducts();
 
-    // Filter products by category
-    const categoryProducts = allProducts.filter(
-      (product) => product.category.toLowerCase() === categoryName.toLowerCase()
-    );
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
 
-    console.log(`Found ${categoryProducts.length} products in category ${categoryName}`);
-    setProducts(categoryProducts);
-  } catch (error) {
-    console.error('Error loading products by category:', error);
-    Alert.alert('Error', 'Failed to load products');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+      switch (sortBy) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'price':
+          aValue = a.discountPrice || a.price;
+          bValue = b.discountPrice || b.price;
+          break;
+        case 'quantity':
+          aValue = a.quantity || 0;
+          bValue = b.quantity || 0;
+          break;
+        default:
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+      }
 
-const handleRefresh = () => {
-  loadProductsByCategory(true);
-};
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortOrder === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
 
-const handleSearch = (query: string) => {
-  setSearchQuery(query);
-};
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+      }
 
-const toggleViewMode = () => {
-  setViewMode(prev => prev === 'list' ? 'grid' : 'list');
-};
+      return 0;
+    });
 
-const renderSkeletonItem = () => (
-  <View style={styles.skeletonCard}>
-    <View style={styles.skeletonImage} />
-    <View style={styles.skeletonContent}>
-      <View style={styles.skeletonLine} />
-      <View style={styles.skeletonShortLine} />
-      <View style={styles.skeletonLine} />
-      <View style={styles.skeletonPriceLine} />
+    return sorted;
+  }, [products, searchQuery, sortBy, sortOrder]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProductsByCategory();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [categoryName])
+  );
+
+  const loadProductsByCategory = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      console.log('Loading products for category:', categoryName);
+      await DatabaseService.initDatabase();
+      const allProducts = await DatabaseService.getAllProducts();
+
+      // Filter products by category
+      const categoryProducts = allProducts.filter(
+        (product) => product.category.toLowerCase() === categoryName.toLowerCase()
+      );
+
+      console.log(`Found ${categoryProducts.length} products in category ${categoryName}`);
+      setProducts(categoryProducts);
+    } catch (error) {
+      console.error('Error loading products by category:', error);
+      Alert.alert('Error', 'Failed to load products');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    loadProductsByCategory(true);
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'list' ? 'grid' : 'list');
+  };
+
+  const renderSkeletonItem = () => (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.skeletonContent}>
+        <View style={styles.skeletonLine} />
+        <View style={styles.skeletonShortLine} />
+        <View style={styles.skeletonLine} />
+        <View style={styles.skeletonPriceLine} />
+      </View>
     </View>
-  </View>
-);
+  );
 
-const renderSkeletonList = () => (
-  <View style={styles.listContainer}>
-    {Array.from({ length: 6 }).map((_, index) => (
-      <View key={index}>{renderSkeletonItem()}</View>
-    ))}
-  </View>
-);
+  const renderSkeletonList = () => (
+    <View style={styles.listContainer}>
+      {Array.from({ length: 6 }).map((_, index) => (
+        <View key={index}>{renderSkeletonItem()}</View>
+      ))}
+    </View>
+  );
 
-const renderItem = ({ item }: { item: Product }) => {
-  const discountPercentage = calculateDiscountPercentage(item.price, item.discountPrice || item.price);
-  const priceCalculation = calculateFinalPrice(item.price, item.discountPrice, item.gstSlab || 0);
+  const renderItem = ({ item }: { item: Product }) => {
+    const discountPercentage = calculateDiscountPercentage(item.price, item.discountPrice || item.price);
+    const priceCalculation = calculateFinalPrice(item.price, item.discountPrice, item.gstSlab || 0);
 
-  if (viewMode === 'grid') {
+    if (viewMode === 'grid') {
+      return (
+        <TouchableOpacity
+          style={styles.productCardGrid}
+          onPress={() => {
+            try {
+              navigation.navigate('ProductDetail', { productId: item.id! });
+            } catch (error) {
+              console.error('Error navigating to product detail:', error);
+              Alert.alert('Error', 'Failed to open product details');
+            }
+          }}
+        >
+          {item.imageUri ? (
+            <Image source={{ uri: item.imageUri }} style={styles.productImageGrid} />
+          ) : (
+            <View style={[styles.productImageGrid, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+              <Icon name="image" size={32} color={colors.text.disabled} />
+            </View>
+          )}
+          <Text style={styles.productNameGrid} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <View style={styles.priceContainerGrid}>
+            <Text style={styles.finalPriceGrid}>
+              {formatPrice(priceCalculation.finalPrice)}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    // List view
     return (
       <TouchableOpacity
-        style={styles.productCardGrid}
+        style={styles.productCard}
         onPress={() => {
           try {
             navigation.navigate('ProductDetail', { productId: item.id! });
@@ -661,239 +755,207 @@ const renderItem = ({ item }: { item: Product }) => {
             Alert.alert('Error', 'Failed to open product details');
           }
         }}
+        activeOpacity={0.7}
       >
         {item.imageUri ? (
-          <Image source={{ uri: item.imageUri }} style={styles.productImageGrid} />
+          <Image
+            source={{ uri: item.imageUri }}
+            style={styles.productImage}
+          />
         ) : (
-          <View style={[styles.productImageGrid, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
+          <View style={[styles.productImage, styles.productImagePlaceholder]}>
             <Icon name="image" size={32} color={colors.text.disabled} />
           </View>
         )}
-        <Text style={styles.productNameGrid} numberOfLines={2}>
-          {item.name}
-        </Text>
-        <View style={styles.priceContainerGrid}>
-          <Text style={styles.finalPriceGrid}>
-            {formatPrice(priceCalculation.finalPrice)}
+        <View style={styles.productInfo}>
+          <Text style={styles.productName} numberOfLines={2}>
+            {item.name}
           </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  }
-
-  // List view
-  return (
-    <TouchableOpacity
-      style={styles.productCard}
-      onPress={() => {
-        try {
-          navigation.navigate('ProductDetail', { productId: item.id! });
-        } catch (error) {
-          console.error('Error navigating to product detail:', error);
-          Alert.alert('Error', 'Failed to open product details');
-        }
-      }}
-      activeOpacity={0.7}
-    >
-      {item.imageUri ? (
-        <Image
-          source={{ uri: item.imageUri }}
-          style={styles.productImage}
-        />
-      ) : (
-        <View style={[styles.productImage, styles.productImagePlaceholder]}>
-          <Icon name="image" size={32} color={colors.text.disabled} />
-        </View>
-      )}
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={2}>
-          {item.name}
-        </Text>
-        <Text style={styles.productCategory}>{item.category}</Text>
-        <View style={styles.productMeta}>
-          {item.gstSlab && item.gstSlab > 0 && (
-            <View style={styles.gstBadge}>
-              <Text style={styles.gstText}>{item.gstSlab}% GST</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.inventoryInfo}>
-          <Text style={styles.quantityText}>Qty: {item.quantity || 0}</Text>
-          {item.quantity !== undefined && (
-            <View style={[
-              styles.stockBadge,
-              item.quantity > 10 ? styles.inStock :
-                item.quantity > 0 ? styles.lowStock :
-                  styles.outOfStock
-            ]}>
-              <Text style={[
-                styles.stockText,
-                item.quantity > 10 ? {} :
-                  item.quantity > 0 ? styles.lowStockText :
-                    styles.outOfStockText
-              ]}>
-                {item.quantity > 10 ? 'In Stock' :
-                  item.quantity > 0 ? 'Low Stock' : 'Out of Stock'}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.priceContainer}>
-          {item.discountPrice ? (
-            <>
-              <Text style={styles.originalPrice}>₹{item.price.toFixed(2)}</Text>
-              <Text style={styles.discountPrice}>₹{item.discountPrice.toFixed(2)}</Text>
-              <View style={styles.discountBadge}>
-                <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
+          <Text style={styles.productCategory}>{item.category}</Text>
+          <View style={styles.productMeta}>
+            {item.gstSlab && item.gstSlab > 0 && (
+              <View style={styles.gstBadge}>
+                <Text style={styles.gstText}>{item.gstSlab}% GST</Text>
               </View>
-            </>
-          ) : (
-            <Text style={styles.price}>₹{item.price.toFixed(2)}</Text>
-          )}
-          <View style={styles.finalPriceContainer}>
-            <Text style={styles.finalPriceLabel}>
-              Final: {formatPrice(priceCalculation.finalPrice)}
-            </Text>
-          </View>
-        </View>
-      </View>
-      <Icon name="chevron-right" size={20} color={colors.text.secondary} />
-    </TouchableOpacity>
-  );
-};
-
-return (
-  <SafeAreaView style={styles.container}>
-    {/* Header handled by native navigation */}
-
-    <View style={styles.searchContainer}>
-      <View style={styles.searchInputContainer}>
-        <Icon name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search products..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-          placeholderTextColor={colors.text.secondary}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={() => handleSearch('')}
-          >
-            <Icon name="close" size={20} color={colors.text.secondary} />
-          </TouchableOpacity>
-        )}
-      </View>
-      {searchQuery.length > 0 && sortedAndFilteredProducts.length > 0 && (
-        <View style={styles.searchResultsCount}>
-          <Text style={styles.searchResultsText}>
-            {sortedAndFilteredProducts.length} result{sortedAndFilteredProducts.length !== 1 ? 's' : ''} found
-          </Text>
-        </View>
-      )}
-    </View>
-
-    {loading ? (
-      renderSkeletonList()
-    ) : (
-      <>
-        {/* Filter and Sort Controls */}
-        {showFilters && (
-          <View style={styles.filterContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterScrollContainer}
-            >
-              <TouchableOpacity
-                style={[styles.filterButton, sortBy === 'name' && styles.filterButtonActive]}
-                onPress={() => setSortBy('name')}
-              >
-                <Icon name="sort-by-alpha" size={16} color={sortBy === 'name' ? colors.text.inverse : colors.text.secondary} />
-                <Text style={[styles.filterText, sortBy === 'name' && styles.filterTextActive]}>Name</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.filterButton, sortBy === 'price' && styles.filterButtonActive]}
-                onPress={() => setSortBy('price')}
-              >
-                <Icon name="currency-rupee" size={16} color={sortBy === 'price' ? colors.text.inverse : colors.text.secondary} />
-                <Text style={[styles.filterText, sortBy === 'price' && styles.filterTextActive]}>Price</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.filterButton, sortBy === 'quantity' && styles.filterButtonActive]}
-                onPress={() => setSortBy('quantity')}
-              >
-                <Icon name="inventory" size={16} color={sortBy === 'quantity' ? colors.text.inverse : colors.text.secondary} />
-                <Text style={[styles.filterText, sortBy === 'quantity' && styles.filterTextActive]}>Stock</Text>
-              </TouchableOpacity>
-            </ScrollView>
-
-            <TouchableOpacity style={styles.viewToggle} onPress={toggleViewMode}>
-              <TouchableOpacity
-                style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleButtonActive]}
-                onPress={() => setViewMode('list')}
-              >
-                <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>List</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleButtonActive]}
-                onPress={() => setViewMode('grid')}
-              >
-                <Text style={[styles.viewToggleText, viewMode === 'grid' && styles.viewToggleTextActive]}>Grid</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {sortedAndFilteredProducts.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <Icon name={searchQuery ? "search-off" : "category"} size={48} color={colors.text.disabled} />
-            </View>
-            <Text style={styles.emptyText}>
-              {searchQuery ? 'No products found' : `No products in ${categoryName}`}
-            </Text>
-            <Text style={styles.emptySubText}>
-              {searchQuery
-                ? 'Try adjusting your search terms or browse other categories'
-                : `Products in the "${categoryName}" category will appear here once added`
-              }
-            </Text>
-            {searchQuery && (
-              <TouchableOpacity
-                style={styles.emptyActionButton}
-                onPress={() => handleSearch('')}
-              >
-                <Icon name="clear-all" size={20} color={colors.text.inverse} />
-                <Text style={styles.emptyActionText}>Clear Search</Text>
-              </TouchableOpacity>
             )}
           </View>
-        ) : (
-          <FlatList
-            data={sortedAndFilteredProducts}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-            contentContainerStyle={styles.listContainer}
-            numColumns={viewMode === 'grid' ? 2 : 1}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={[colors.primary]}
-                tintColor={colors.primary}
-              />
-            }
-            key={viewMode} // Force re-render when view mode changes
+          <View style={styles.inventoryInfo}>
+            <Text style={styles.quantityText}>Qty: {item.quantity || 0}</Text>
+            {item.quantity !== undefined && (
+              <View style={[
+                styles.stockBadge,
+                item.quantity > 10 ? styles.inStock :
+                  item.quantity > 0 ? styles.lowStock :
+                    styles.outOfStock
+              ]}>
+                <Text style={[
+                  styles.stockText,
+                  item.quantity > 10 ? {} :
+                    item.quantity > 0 ? styles.lowStockText :
+                      styles.outOfStockText
+                ]}>
+                  {item.quantity > 10 ? 'In Stock' :
+                    item.quantity > 0 ? 'Low Stock' : 'Out of Stock'}
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.priceContainer}>
+            {item.discountPrice ? (
+              <>
+                <Text style={styles.originalPrice}>₹{item.price.toFixed(2)}</Text>
+                <Text style={styles.discountPrice}>₹{item.discountPrice.toFixed(2)}</Text>
+                <View style={styles.discountBadge}>
+                  <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.price}>₹{item.price.toFixed(2)}</Text>
+            )}
+            <View style={styles.finalPriceContainer}>
+              <Text style={styles.finalPriceLabel}>
+                Final: {formatPrice(priceCalculation.finalPrice)}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <Icon name="chevron-right" size={20} color={colors.text.secondary} />
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header handled by native navigation */}
+
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Icon name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search products..."
+            value={searchQuery}
+            onChangeText={handleSearch}
+            placeholderTextColor={colors.text.secondary}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={() => handleSearch('')}
+            >
+              <Icon name="close" size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {searchQuery.length > 0 && sortedAndFilteredProducts.length > 0 && (
+          <View style={styles.searchResultsCount}>
+            <Text style={styles.searchResultsText}>
+              {sortedAndFilteredProducts.length} result{sortedAndFilteredProducts.length !== 1 ? 's' : ''} found
+            </Text>
+          </View>
         )}
-      </>
-    )}
-  </SafeAreaView>
-);
+      </View>
+
+      {loading ? (
+        renderSkeletonList()
+      ) : (
+        <>
+          {/* Filter and Sort Controls */}
+          {showFilters && (
+            <View style={styles.filterContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterScrollContainer}
+              >
+                <TouchableOpacity
+                  style={[styles.filterButton, sortBy === 'name' && styles.filterButtonActive]}
+                  onPress={() => setSortBy('name')}
+                >
+                  <Icon name="sort-by-alpha" size={16} color={sortBy === 'name' ? colors.text.inverse : colors.text.secondary} />
+                  <Text style={[styles.filterText, sortBy === 'name' && styles.filterTextActive]}>Name</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.filterButton, sortBy === 'price' && styles.filterButtonActive]}
+                  onPress={() => setSortBy('price')}
+                >
+                  <Icon name="currency-rupee" size={16} color={sortBy === 'price' ? colors.text.inverse : colors.text.secondary} />
+                  <Text style={[styles.filterText, sortBy === 'price' && styles.filterTextActive]}>Price</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.filterButton, sortBy === 'quantity' && styles.filterButtonActive]}
+                  onPress={() => setSortBy('quantity')}
+                >
+                  <Icon name="inventory" size={16} color={sortBy === 'quantity' ? colors.text.inverse : colors.text.secondary} />
+                  <Text style={[styles.filterText, sortBy === 'quantity' && styles.filterTextActive]}>Stock</Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              <TouchableOpacity style={styles.viewToggle} onPress={toggleViewMode}>
+                <TouchableOpacity
+                  style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleButtonActive]}
+                  onPress={() => setViewMode('list')}
+                >
+                  <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>List</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.viewToggleButton, viewMode === 'grid' && styles.viewToggleButtonActive]}
+                  onPress={() => setViewMode('grid')}
+                >
+                  <Text style={[styles.viewToggleText, viewMode === 'grid' && styles.viewToggleTextActive]}>Grid</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {sortedAndFilteredProducts.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconContainer}>
+                <Icon name={searchQuery ? "search-off" : "category"} size={48} color={colors.text.disabled} />
+              </View>
+              <Text style={styles.emptyText}>
+                {searchQuery ? 'No products found' : `No products in ${categoryName}`}
+              </Text>
+              <Text style={styles.emptySubText}>
+                {searchQuery
+                  ? 'Try adjusting your search terms or browse other categories'
+                  : `Products in the "${categoryName}" category will appear here once added`
+                }
+              </Text>
+              {searchQuery && (
+                <TouchableOpacity
+                  style={styles.emptyActionButton}
+                  onPress={() => handleSearch('')}
+                >
+                  <Icon name="clear-all" size={20} color={colors.text.inverse} />
+                  <Text style={styles.emptyActionText}>Clear Search</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <FlatList
+              data={sortedAndFilteredProducts}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+              contentContainerStyle={styles.listContainer}
+              numColumns={viewMode === 'grid' ? 2 : 1}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[colors.primary]}
+                  tintColor={colors.primary}
+                />
+              }
+              key={viewMode} // Force re-render when view mode changes
+            />
+          )}
+        </>
+      )}
+    </SafeAreaView>
+  );
 };
 
 export default CategoryProductsScreen;
