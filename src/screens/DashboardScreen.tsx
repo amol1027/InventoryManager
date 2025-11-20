@@ -1,25 +1,33 @@
-import React, { useState, useCallback, useLayoutEffect, useEffect } from 'react';
+import React, { useState, useCallback, useLayoutEffect } from 'react';
 import { useNavigation, useFocusEffect, DrawerActions } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
   Alert,
-  Image,
   Platform,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  interpolate,
+  Extrapolate,
+  withTiming,
+} from 'react-native-reanimated';
 
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
 import ProductCard from '../components/ProductCard';
+import SkeletonProductCard from '../components/SkeletonProductCard';
 
 type DashboardScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Dashboard'>;
 type SortOption = 'category' | 'nameAsc' | 'nameDesc' | 'priceAsc' | 'priceDesc' | 'discount';
@@ -30,64 +38,50 @@ interface ExtendedProduct extends Product {
   image?: string;
 }
 
+const HEADER_MAX_HEIGHT = 120;
+const HEADER_MIN_HEIGHT = Platform.OS === 'ios' ? 90 : 70;
+const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
+
 const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
   header: {
-    backgroundColor: colors.surface,
-    borderBottomWidth: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    overflow: 'hidden',
+    zIndex: 10,
     elevation: 4,
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
   },
   headerContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: HEADER_MIN_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(91, 141, 239, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(91, 141, 239, 0.25)',
-  },
-  headerTextContainer: {
-    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    color: colors.text.inverse,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   searchContainer: {
+    marginTop: HEADER_MAX_HEIGHT,
     flexDirection: 'row',
     padding: 16,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    zIndex: 5,
   },
   searchInput: {
     flex: 1,
@@ -98,15 +92,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     marginRight: 8,
     color: colors.text.primary,
   },
-  sortButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   listContainer: {
     padding: 16,
+    paddingTop: 0, // Search container has margin
   },
   loadingContainer: {
     flex: 1,
@@ -118,6 +106,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    marginTop: 50,
   },
   emptyText: {
     fontSize: 16,
@@ -127,7 +116,7 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   sortOptionsContainer: {
     position: 'absolute',
-    top: 60,
+    top: HEADER_MAX_HEIGHT + 60,
     right: 16,
     backgroundColor: colors.surface,
     borderRadius: 8,
@@ -172,6 +161,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
   },
+  headerBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.primary,
+  },
 });
 
 const PAGE_SIZE = 20;
@@ -191,46 +184,51 @@ const DashboardScreen = () => {
   const [sortOption, setSortOption] = useState<SortOption>('nameAsc');
   const [showSortOptions, setShowSortOptions] = useState(false);
 
-  // Configure native header
+  const scrollY = useSharedValue(0);
+
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+  });
+
+  const headerStyle = useAnimatedStyle(() => {
+    const height = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      height,
+    };
+  });
+
+  const titleStyle = useAnimatedStyle(() => {
+    const scale = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [1.2, 1],
+      Extrapolate.CLAMP
+    );
+
+    const translateY = interpolate(
+      scrollY.value,
+      [0, HEADER_SCROLL_DISTANCE],
+      [10, 0],
+      Extrapolate.CLAMP
+    );
+
+    return {
+      transform: [{ scale }, { translateY }],
+    };
+  });
+
+  // Hide default header
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: 'Dashboard',
-      headerLeft: () => (
-        <TouchableOpacity
-          onPress={() => {
-            try {
-              // Try multiple methods to access drawer
-              const parent = (navigation as any).getParent?.();
-              if (parent?.dispatch) {
-                parent.dispatch(DrawerActions.toggleDrawer());
-              } else if ((navigation as any).dispatch) {
-                (navigation as any).dispatch(DrawerActions.toggleDrawer());
-              } else {
-                // Fallback: try to access drawer through root navigation
-                const root = (navigation as any).getRootState?.();
-                if (root?.routes?.[0]?.state) {
-                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
-                }
-              }
-            } catch (error) {
-              console.error('Error toggling drawer:', error);
-            }
-          }}
-          style={{ paddingHorizontal: 8 }}
-        >
-          <Icon name="menu" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      ),
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={() => setShowSortOptions((prev) => !prev)}
-          style={{ paddingHorizontal: 8 }}
-        >
-          <Icon name="sort" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      ),
+      headerShown: false,
     });
-  }, [navigation, colors.text.inverse]);
+  }, [navigation]);
 
   const loadProducts = useCallback(async (reset: boolean = false) => {
     try {
@@ -247,17 +245,10 @@ const DashboardScreen = () => {
       let newProducts: ExtendedProduct[] = [];
 
       if (searchQuery) {
-        // If searching, we currently don't support pagination in the search query itself efficiently without more complex SQL
-        // For now, we'll stick to the existing search behavior but maybe we should optimize it later
-        // Or we can fetch all and filter client side if the dataset isn't HUGE, but the goal is performance.
-        // Let's use the searchProducts method which returns all matches for now.
-        // TODO: Implement paginated search in DatabaseService
         newProducts = await DatabaseService.searchProducts(searchQuery);
-        setHasMore(false); // Disable pagination for search results for now
+        setHasMore(false);
       } else {
         newProducts = await DatabaseService.getProducts(PAGE_SIZE, offset);
-
-        // Check if we have more products
         if (newProducts.length < PAGE_SIZE) {
           setHasMore(false);
         } else {
@@ -265,11 +256,7 @@ const DashboardScreen = () => {
         }
       }
 
-      // Apply sorting
-      // Note: Sorting is currently done client-side after fetching a page. 
-      // For true server-side sorting with pagination, we'd need to pass sort options to the SQL query.
-      // For this implementation, we'll sort the fetched page, which is an approximation.
-      // Ideally, we should update DatabaseService to accept sort parameters.
+      // Client-side sorting
       let sortedProducts = [...newProducts];
       switch (sortOption) {
         case 'nameAsc':
@@ -301,7 +288,7 @@ const DashboardScreen = () => {
       if (!reset) {
         setPage(prev => prev + 1);
       } else {
-        setPage(1); // Next page will be 1
+        setPage(1);
       }
 
     } catch (error) {
@@ -314,11 +301,10 @@ const DashboardScreen = () => {
     }
   }, [searchQuery, sortOption, page]);
 
-  // Initial load
   useFocusEffect(
     useCallback(() => {
       loadProducts(true);
-    }, [searchQuery, sortOption]) // Reload when search or sort changes
+    }, [searchQuery, sortOption])
   );
 
   const handleLoadMore = () => {
@@ -376,7 +362,41 @@ const DashboardScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header handled by native navigation */}
+      <StatusBar backgroundColor={colors.primary} barStyle="light-content" />
+
+      {/* Animated Header */}
+      <Animated.View style={[styles.header, headerStyle]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            onPress={() => {
+              try {
+                const parent = (navigation as any).getParent?.();
+                if (parent?.dispatch) {
+                  parent.dispatch(DrawerActions.toggleDrawer());
+                } else {
+                  navigation.dispatch(DrawerActions.toggleDrawer());
+                }
+              } catch (error) {
+                console.error('Error toggling drawer:', error);
+              }
+            }}
+            style={{ padding: 8 }}
+          >
+            <Icon name="menu" size={24} color={colors.text.inverse} />
+          </TouchableOpacity>
+
+          <Animated.Text style={[styles.headerTitle, titleStyle]}>
+            Dashboard
+          </Animated.Text>
+
+          <TouchableOpacity
+            onPress={() => setShowSortOptions((prev) => !prev)}
+            style={{ padding: 8 }}
+          >
+            <Icon name="sort" size={24} color={colors.text.inverse} />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
       <View style={styles.searchContainer}>
         <TextInput
@@ -428,11 +448,13 @@ const DashboardScreen = () => {
       )}
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={styles.listContainer}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonProductCard key={i} />
+          ))}
         </View>
       ) : (
-        <FlatList
+        <Animated.FlatList
           data={products}
           renderItem={renderProductItem}
           keyExtractor={(item) => item.id?.toString() || `product-${item.name}-${item.price}`}
@@ -444,6 +466,8 @@ const DashboardScreen = () => {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
           }
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
         />
       )}
 

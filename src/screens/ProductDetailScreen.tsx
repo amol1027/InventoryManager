@@ -1,20 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { ViewStyle, TextStyle, ImageStyle } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  StyleSheet,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   TextInput,
   Image,
   Dimensions,
-} from 'react-native';
-import {
-  Animated,
   Modal,
-  Share,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -22,469 +19,40 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  interpolate,
+  Extrapolate,
+  withTiming,
+  withDelay,
+  FadeInDown,
+  runOnJS,
+} from 'react-native-reanimated';
 import { ErrorHandler, DatabaseErrorHandler } from '../utils/ErrorHandler';
 import { ConfirmationDialog } from '../utils/ConfirmationDialog';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
-import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
+import { calculateFinalPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
 
 const GST_SLABS = [0, 5, 12, 18, 28];
+const { width: WINDOW_WIDTH, height: WINDOW_HEIGHT } = Dimensions.get('window');
+const HEADER_HEIGHT = 300;
+const COLLAPSED_HEADER_HEIGHT = Platform.OS === 'ios' ? 90 : 70;
 
 type ProductDetailScreenRouteProp = RouteProp<RootStackParamList, 'ProductDetail'>;
 type ProductDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProductDetail'>;
-
-const styles = {
-  container: {
-    flex: 1,
-  },
-  centered: {
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  skeletonContainer: {
-    padding: 16,
-  },
-  skeletonImage: {
-    width: Dimensions.get('window').width - 32,
-    height: 300,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  skeletonContent: {
-    padding: 16,
-  },
-  skeletonTitle: {
-    height: 28,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  skeletonBadge: {
-    height: 24,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 12,
-    marginBottom: 8,
-    alignSelf: 'flex-start' as const,
-  },
-  skeletonPrice: {
-    height: 36,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  skeletonInfoGrid: {
-    flexDirection: 'row' as const,
-    gap: 12,
-  },
-  errorContainer: {
-    alignItems: 'center' as const,
-    padding: 32,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: 'bold' as const,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  errorSubtitle: {
-    fontSize: 16,
-    textAlign: 'center' as const,
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  errorButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  errorButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  customHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold' as const,
-  },
-  content: {
-    padding: 16,
-  },
-  imageSection: {
-    position: 'relative' as const,
-    marginBottom: 16,
-  },
-  productImage: {
-    width: Dimensions.get('window').width - 32,
-    height: 280,
-    borderRadius: 16,
-  },
-  noImageContainer: {
-    width: Dimensions.get('window').width - 32,
-    height: 280,
-    borderRadius: 16,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  noImageText: {
-    fontSize: 16,
-    fontWeight: '500' as const,
-    marginTop: 12,
-  },
-  discountBadge: {
-    position: 'absolute' as const,
-    top: 16,
-    right: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  discountText: {
-    fontSize: 14,
-    fontWeight: 'bold' as const,
-  },
-  infoCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  productTitle: {
-    fontSize: 24,
-    fontWeight: 'bold' as const,
-    marginBottom: 16,
-    lineHeight: 32,
-  },
-  metaContainer: {
-    flexDirection: 'row' as const,
-    gap: 12,
-  },
-  categoryBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  stockBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  stockText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  priceCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  priceHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginBottom: 16,
-    gap: 8,
-  },
-  priceLabel: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  discountContainer: {
-    gap: 12,
-  },
-  priceRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 12,
-  },
-  originalPrice: {
-    fontSize: 18,
-    textDecorationLine: 'line-through' as const,
-  },
-  discountPrice: {
-    fontSize: 32,
-    fontWeight: 'bold' as const,
-  },
-  savingsBadge: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    gap: 6,
-    alignSelf: 'flex-start' as const,
-  },
-  savingsText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  regularPrice: {
-    fontSize: 32,
-    fontWeight: 'bold' as const,
-  },
-  infoGrid: {
-    flexDirection: 'row' as const,
-    gap: 12,
-    marginBottom: 16,
-  },
-  infoItem: {
-    flex: 1,
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center' as const,
-  },
-  infoIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    marginBottom: 12,
-  },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '500' as const,
-    marginBottom: 8,
-  },
-  infoValue: {
-    fontSize: 20,
-    fontWeight: 'bold' as const,
-  },
-  detailsCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  detailsHeader: {
-  },
-  actionContainer: {
-    gap: 12,
-    marginBottom: 32,
-  },
-  editButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    gap: 8,
-  },
-  deleteButton: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    gap: 8,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  editHeader: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  formContainer: {
-    padding: 16,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  row: {
-    flexDirection: 'row' as const,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    marginBottom: 8,
-  },
-  input: {
-    fontWeight: '500' as const,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderRadius: 12,
-    overflow: 'hidden' as const,
-  },
-  picker: {
-    height: 54,
-  },
-  imagePicker: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    borderWidth: 2,
-    borderStyle: 'dashed' as const,
-    borderRadius: 12,
-    padding: 20,
-    gap: 12,
-  },
-  imagePickerText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-  },
-  imagePreview: {
-    width: Dimensions.get('window').width - 64,
-    height: 200,
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    minHeight: 120,
-    textAlignVertical: 'top' as const,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  modalBackdrop: {
-    flex: 1,
-    width: Dimensions.get('window').width,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  modalContent: {
-    position: 'relative' as const,
-    width: 300,
-    height: 400,
-  },
-  modalImage: {
-    width: 300,
-    height: 400,
-    borderRadius: 16,
-  },
-  closeButton: {
-    position: 'absolute' as const,
-    top: 8,
-    right: 8,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  finalPriceContainer: {
-    backgroundColor: '#28a74520',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginTop: 8,
-    alignSelf: 'flex-start' as const,
-  },
-  finalPriceLabel: {
-    color: '#28a745',
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
-  priceContainer: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 8,
-  },
-  priceDetailsContainer: {
-    alignItems: 'center' as const,
-    minWidth: 60,
-  },
-  finalPrice: {
-    fontSize: 18,
-    fontWeight: 'bold' as const,
-  },
-  gstContainer: {
-    alignItems: 'center' as const,
-    minWidth: 60,
-  },
-  gstAmount: {
-    fontSize: 14,
-    fontWeight: 'bold' as const,
-  },
-  gstLabel: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  discountAmount: {
-    fontSize: 16,
-    fontWeight: 'bold' as const,
-  },
-  discountLabel: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  basePriceContainer: {
-    alignItems: 'center' as const,
-    minWidth: 60,
-  },
-  basePrice: {
-    fontSize: 14,
-    textDecorationLine: 'line-through' as const,
-  },
-  basePriceLabel: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  errorText: {
-    fontSize: 14,
-    marginTop: 4,
-    fontWeight: '500' as const,
-  },
-  detailsTitle: {
-    fontSize: 18,
-    fontWeight: '600' as const,
-  },
-  detailsText: {
-    fontSize: 15,
-    lineHeight: 24,
-  },
-};
 
 const ProductDetailScreen = () => {
   const route = useRoute<ProductDetailScreenRouteProp>();
   const navigation = useNavigation<ProductDetailScreenNavigationProp>();
   const { colors } = useTheme();
   const { productId } = route.params;
-  const windowWidth = Dimensions.get('window').width;
-  const windowHeight = Dimensions.get('window').height;
 
   // Animation values
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const slideAnim = useState(new Animated.Value(50))[0];
+  const scrollY = useSharedValue(0);
+  const headerOpacity = useSharedValue(0);
 
   // State variables
   const [product, setProduct] = useState<Product | null>(null);
@@ -492,7 +60,6 @@ const ProductDetailScreen = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [imageScale, setImageScale] = useState(new Animated.Value(1));
   const [categories, setCategories] = useState<string[]>([]);
 
   // Form state
@@ -512,29 +79,8 @@ const ProductDetailScreen = () => {
 
   useEffect(() => {
     loadProduct();
-  }, [productId]);
-
-  useEffect(() => {
     loadCategories();
-  }, []);
-
-  useEffect(() => {
-    if (!loading && product) {
-      // Animate content in
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [loading, product]);
+  }, [productId]);
 
   const loadCategories = async () => {
     try {
@@ -642,27 +188,13 @@ const ProductDetailScreen = () => {
     ]);
   };
 
-  const handleShare = async () => {
-    if (!product) return;
-
-    try {
-      const shareMessage = `Check out this product: ${product.name}\nPrice: ₹${product.price.toFixed(2)}${product.discountPrice ? ` (Discount: ₹${product.discountPrice.toFixed(2)})` : ''}\nCategory: ${product.category}`;
-
-      await Share.share({
-        message: shareMessage,
-      });
-    } catch (error) {
-      console.error('Error sharing product:', error);
-    }
-  };
-
   const handleSave = async () => {
     if (!validateForm()) return;
 
     try {
       setIsSaving(true);
       const updatedProduct: Product = {
-        ...product,
+        ...product!,
         id: productId,
         name,
         category,
@@ -701,12 +233,6 @@ const ProductDetailScreen = () => {
     setIsEditing(false);
   };
 
-  const handleImageZoom = () => {
-    if (product?.imageUri) {
-      setImageModalVisible(true);
-    }
-  };
-
   const handleDelete = () => {
     if (!product) return;
 
@@ -728,531 +254,667 @@ const ProductDetailScreen = () => {
     );
   };
 
-  const LoadingSkeleton = () => (
-    <View style={styles.skeletonContainer}>
-      <View style={styles.skeletonImage} />
-      <View style={styles.skeletonContent}>
-        <View style={styles.skeletonTitle} />
-        <View style={styles.skeletonBadge} />
-        <View style={styles.skeletonBadge} />
-        <View style={styles.skeletonPrice} />
-        <View style={styles.skeletonInfoGrid} />
-      </View>
-    </View>
-  );
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
+    if (event.contentOffset.y > HEADER_HEIGHT - COLLAPSED_HEADER_HEIGHT) {
+      headerOpacity.value = withTiming(1);
+    } else {
+      headerOpacity.value = withTiming(0);
+    }
+  });
+
+  const headerAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: headerOpacity.value,
+    };
+  });
+
+  const imageAnimatedStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(
+      scrollY.value,
+      [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
+      [HEADER_HEIGHT / 2, 0, -HEADER_HEIGHT / 3],
+      Extrapolate.CLAMP
+    );
+    const scale = interpolate(
+      scrollY.value,
+      [-HEADER_HEIGHT, 0],
+      [2, 1],
+      Extrapolate.CLAMP
+    );
+    return {
+      transform: [{ translateY }, { scale }],
+    };
+  });
+
+  const styles = getStyles(colors);
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LoadingSkeleton />
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
-  if (!product) {
-    return (
-      <View style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
-        <View style={styles.errorContainer}>
-          <Icon name="error-outline" size={80} color={colors.error} />
-          <Text style={[styles.errorTitle, { color: colors.text.primary }]}>
-            Product Not Found
-          </Text>
-          <Text style={[styles.errorSubtitle, { color: colors.text.secondary }]}>
-            The product you're looking for doesn't exist or has been deleted.
-          </Text>
-          <TouchableOpacity
-            style={[styles.errorButton, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={[styles.errorButtonText, { color: colors.text.inverse }]}>
-              Go Back
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  if (!product) return null;
 
   const discountPercentage = calculateDiscountPercentage(product.price, product.discountPrice || product.price);
   const priceCalculation = calculateFinalPrice(product.price, product.discountPrice, product.gstSlab || 0);
 
   const stockStatus = !product.quantity || product.quantity === 0
-    ? {
-        text: 'Out of Stock',
-        color: colors.error,
-        bg: 'rgba(220, 53, 69, 0.15)',
-        icon: 'remove-circle',
-        severity: 'high'
-      }
+    ? { text: 'Out of Stock', color: colors.error, icon: 'remove-circle' }
     : product.quantity <= 10
-    ? {
-        text: 'Low Stock',
-        color: colors.warning,
-        bg: 'rgba(255, 193, 7, 0.15)',
-        icon: 'warning',
-        severity: 'medium'
-      }
-    : {
-        text: 'In Stock',
-        color: colors.success,
-        bg: 'rgba(40, 167, 69, 0.15)',
-        icon: 'check-circle',
-        severity: 'good'
-      };
-
-  if (isEditing) {
-    return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.editHeader}>
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: colors.surface }]}
-            onPress={handleCancel}
-            disabled={isSaving}
-          >
-            <Icon name="close" size={24} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-            Edit Product
-          </Text>
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: colors.surface }]}
-            onPress={handleSave}
-            disabled={isSaving}
-          >
-            {isSaving ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Icon name="check" size={24} color={colors.primary} />
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.formContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              Product Name *
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { backgroundColor: colors.surface, borderColor: errors.name ? colors.error : colors.border, color: colors.text.primary }
-              ]}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter product name"
-              placeholderTextColor={colors.text.disabled}
-            />
-            {errors.name ? (
-              <Text style={[styles.errorText, { color: colors.error }]}>
-                {errors.name}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              Category *
-            </Text>
-            <View style={[styles.pickerContainer, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              <Picker
-                selectedValue={category}
-                onValueChange={setCategory}
-                style={[styles.picker, { color: colors.text.primary }]}
-              >
-                {categories.map((cat) => (
-                  <Picker.Item key={cat} label={cat} value={cat} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>
-                Price (₹) *
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  { backgroundColor: colors.surface, borderColor: errors.price ? colors.error : colors.border, color: colors.text.primary }
-                ]}
-                value={price}
-                onChangeText={setPrice}
-                placeholder="0.00"
-                keyboardType="decimal-pad"
-                placeholderTextColor={colors.text.disabled}
-              />
-              {errors.price ? (
-                <Text style={[styles.errorText, { color: colors.error }]}>
-                  {errors.price}
-                </Text>
-              ) : null}
-            </View>
-
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-              <Text style={[styles.label, { color: colors.text.primary }]}>
-                Quantity
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text.primary }
-                ]}
-                value={quantity}
-                onChangeText={setQuantity}
-                placeholder="0"
-                keyboardType="number-pad"
-                placeholderTextColor={colors.text.disabled}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              Discount Price (₹)
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                { backgroundColor: colors.surface, borderColor: errors.discountPrice ? colors.error : colors.border, color: colors.text.primary }
-              ]}
-              value={discountPrice}
-              onChangeText={setDiscountPrice}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              placeholderTextColor={colors.text.disabled}
-            />
-            {errors.discountPrice ? (
-              <Text style={[styles.errorText, { color: colors.error }]}>
-                {errors.discountPrice}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              GST Slab (%)
-            </Text>
-            <View style={[styles.pickerContainer, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              <Picker
-                selectedValue={gstSlab}
-                onValueChange={setGstSlab}
-                style={[styles.picker, { color: colors.text.primary }]}
-              >
-                {GST_SLABS.map((slab) => (
-                  <Picker.Item key={slab} label={`${slab}%`} value={slab} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              Product Image
-            </Text>
-            <TouchableOpacity
-              style={[styles.imagePicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={pickImage}
-            >
-              <Icon name="add-photo-alternate" size={24} color={colors.primary} />
-              <Text style={[styles.imagePickerText, { color: colors.primary }]}>
-                {imageUri ? 'Change Image' : 'Add Product Image'}
-              </Text>
-            </TouchableOpacity>
-            {imageUri && (
-              <TouchableOpacity onPress={handleImageZoom}>
-                <Image
-                  source={{ uri: imageUri }}
-                  style={styles.imagePreview}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              Additional Details
-            </Text>
-            <TextInput
-              style={[
-                styles.textArea,
-                { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text.primary }
-              ]}
-              value={details}
-              onChangeText={setDetails}
-              placeholder="Enter product details, specifications, etc."
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              placeholderTextColor={colors.text.disabled}
-            />
-          </View>
-        </View>
-
-        {/* Image Zoom Modal */}
-        <Modal
-          visible={imageModalVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setImageModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <TouchableOpacity
-              style={styles.modalBackdrop}
-              onPress={() => setImageModalVisible(false)}
-              activeOpacity={1}
-            >
-              <TouchableOpacity
-                style={styles.modalContent}
-                onPress={() => setImageModalVisible(false)}
-                activeOpacity={1}
-              >
-                {imageUri && (
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={styles.modalImage}
-                    resizeMode="contain"
-                  />
-                )}
-                <TouchableOpacity
-                  style={[styles.closeButton, { backgroundColor: colors.surface }]}
-                  onPress={() => setImageModalVisible(false)}
-                >
-                  <Icon name="close" size={24} color={colors.text.primary} />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </View>
-        </Modal>
-      </ScrollView>
-    );
-  }
+      ? { text: 'Low Stock', color: colors.warning, icon: 'warning' }
+      : { text: 'In Stock', color: colors.success, icon: 'check-circle' };
 
   return (
-    <Animated.ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Custom Header */}
-      <View style={[styles.customHeader, { backgroundColor: colors.surface }]}>
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: colors.background }]}
-          onPress={() => navigation.goBack()}
-        >
-          <Icon name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
-          Product Details
-        </Text>
-
-        <TouchableOpacity
-          style={[styles.headerButton, { backgroundColor: colors.background }]}
-          onPress={handleShare}
-        >
-          <Icon name="share" size={24} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        {/* Image Section */}
-        <View style={styles.imageSection}>
-          <TouchableOpacity onPress={handleImageZoom} activeOpacity={0.9}>
-            {product.imageUri ? (
-              <Image
-                source={{ uri: product.imageUri }}
-                style={styles.productImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={[styles.noImageContainer, { backgroundColor: colors.surface }]}>
-                <Icon name="image" size={64} color={colors.text.disabled} />
-                <Text style={[styles.noImageText, { color: colors.text.disabled }]}>
-                  No Image Available
-                </Text>
-              </View>
-            )}
+      {/* Collapsed Header */}
+      <Animated.View style={[styles.collapsedHeader, headerAnimatedStyle]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color={colors.text.inverse} />
           </TouchableOpacity>
-        </View>
-
-        {/* Product Info Card */}
-        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.productTitle, { color: colors.text.primary }]}>
-            {product.name}
-          </Text>
-
-          <View style={styles.metaContainer}>
-            <View style={[styles.categoryBadge, { backgroundColor: colors.primary }]}>
-              <Icon name="category" size={16} color={colors.text.inverse} />
-              <Text style={[styles.categoryText, { color: colors.text.inverse }]}>
-                {product.category}
-              </Text>
-            </View>
-
-            <View style={[styles.stockBadge, { backgroundColor: stockStatus.bg }]}>
-              <Icon name={stockStatus.icon} size={16} color={stockStatus.color} />
-              <Text style={[styles.stockText, { color: stockStatus.color }]}>
-                {stockStatus.text}
-              </Text>
-            </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>{product.name}</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={styles.headerAction}>
+              <Icon name={isEditing ? "close" : "edit"} size={24} color={colors.text.inverse} />
+            </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Price Card */}
-        <View style={[styles.priceCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.priceHeader}>
-            <Icon name="currency-rupee" size={24} color={colors.primary} />
-            <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>
-              Price Information
-            </Text>
-          </View>
-
-          <View style={styles.priceContainer}>
-            <View style={styles.priceDetailsContainer}>
-              <Text style={[styles.finalPrice, { color: colors.success, fontSize: 28 }]}>
-                {formatPrice(priceCalculation.finalPrice)}
-              </Text>
-              <Text style={[styles.finalPriceLabel, { color: colors.success, marginTop: 4 }]}>
-                After GST
-              </Text>
-            </View>
-            <View style={styles.gstContainer}>
-              <Text style={[styles.gstAmount, { color: colors.secondary }]}>
-                +₹{priceCalculation.gstAmount.toFixed(2)}
-              </Text>
-              <Text style={[styles.gstLabel, { color: colors.text.secondary, marginTop: 2 }]}>
-                {priceCalculation.gstPercentage}% GST
-              </Text>
-            </View>
-            {product.discountPrice && (
-              <View style={styles.discountContainer}>
-                <Text style={[styles.discountAmount, { color: colors.accent }]}>
-                  -₹{(product.price - product.discountPrice).toFixed(2)}
-                </Text>
-                <Text style={[styles.discountLabel, { color: colors.text.secondary, marginTop: 2 }]}>
-                  Discount
-                </Text>
-              </View>
-            )}
-            <View style={styles.basePriceContainer}>
-              <Text style={[styles.basePrice, { color: colors.text.secondary }]}>
-                ₹{product.price.toFixed(2)}
-              </Text>
-              <Text style={[styles.basePriceLabel, { color: colors.text.secondary, marginTop: 2 }]}>
-                Base
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Info Grid */}
-        <View style={styles.infoGrid}>
-          <View style={[styles.infoItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.infoIconContainer, { backgroundColor: colors.primary + '20' }]}>
-              <Icon name="inventory" size={24} color={colors.primary} />
-            </View>
-            <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>
-              Stock Quantity
-            </Text>
-            <Text style={[styles.infoValue, { color: colors.text.primary }]}>
-              {product.quantity || 0}
-            </Text>
-          </View>
-
-          <View style={[styles.infoItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.infoIconContainer, { backgroundColor: colors.secondary + '20' }]}>
-              <Icon name="receipt" size={24} color={colors.secondary} />
-            </View>
-            <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>
-              GST Slab
-            </Text>
-            <Text style={[styles.infoValue, { color: colors.text.primary }]}>
-              {product.gstSlab || 0}%
-            </Text>
-          </View>
-        </View>
-
-        {/* Details Section */}
-        {product.details && (
-          <View style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.detailsHeader}>
-              <Icon name="description" size={24} color={colors.primary} />
-              <Text style={[styles.detailsTitle, { color: colors.text.primary }]}>
-                Product Details
-              </Text>
-            </View>
-            <Text style={[styles.detailsText, { color: colors.text.primary }]}>
-              {product.details}
-            </Text>
-          </View>
-        )}
-
-        {/* Action Buttons */}
-        <View style={styles.actionContainer}>
-          <TouchableOpacity
-            style={[styles.editButton, { backgroundColor: colors.primary }]}
-            onPress={() => setIsEditing(true)}
-          >
-            <Icon name="edit" size={20} color={colors.text.inverse} />
-            <Text style={[styles.actionButtonText, { color: colors.text.inverse }]}>
-              Edit Product
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.deleteButton, { backgroundColor: colors.error }]}
-            onPress={handleDelete}
-          >
-            <Icon name="delete" size={20} color={colors.text.inverse} />
-            <Text style={[styles.actionButtonText, { color: colors.text.inverse }]}>
-              Delete Product
-            </Text>
-          </TouchableOpacity>
         </View>
       </Animated.View>
 
-      {/* Image Zoom Modal */}
-      <Modal
-        visible={imageModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setImageModalVisible(false)}
+      {/* Floating Back Button (Visible when header is transparent) */}
+      <Animated.View style={[styles.floatingBackButton, { opacity: interpolate(headerOpacity.value, [0, 1], [1, 0]) }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.roundButton}>
+          <Icon name="arrow-back" size={24} color={colors.text.primary} />
+        </TouchableOpacity>
+      </Animated.View>
+
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            onPress={() => setImageModalVisible(false)}
-            activeOpacity={1}
-          >
-            <View style={styles.modalContent}>
-              {product.imageUri && (
-                <Image
-                  source={{ uri: product.imageUri }}
-                  style={styles.modalImage}
-                  resizeMode="contain"
-                />
+        {/* Hero Image */}
+        <View style={styles.imageContainer}>
+          <Animated.Image
+            source={imageUri ? { uri: imageUri } : require('../assets/placeholder.png')}
+            style={[styles.heroImage, imageAnimatedStyle]}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay} />
+
+          {/* Hero Content */}
+          <View style={styles.heroContent}>
+            <Animated.Text entering={FadeInDown.delay(100).duration(600)} style={styles.heroCategory}>
+              {product.category}
+            </Animated.Text>
+            <Animated.Text entering={FadeInDown.delay(200).duration(600)} style={styles.heroTitle}>
+              {product.name}
+            </Animated.Text>
+            <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.heroMeta}>
+              <View style={[styles.badge, { backgroundColor: stockStatus.color }]}>
+                <Icon name={stockStatus.icon} size={16} color="#FFF" />
+                <Text style={styles.badgeText}>{stockStatus.text}</Text>
+              </View>
+              {discountPercentage > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.error }]}>
+                  <Icon name="local-offer" size={16} color="#FFF" />
+                  <Text style={styles.badgeText}>{discountPercentage}% OFF</Text>
+                </View>
               )}
-              <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: colors.surface }]}
-                onPress={() => setImageModalVisible(false)}
-              >
-                <Icon name="close" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
+            </Animated.View>
+          </View>
+        </View>
+
+        {/* Main Content */}
+        <View style={styles.contentContainer}>
+          {isEditing ? (
+            // Edit Mode Form
+            <Animated.View entering={FadeInDown.duration(400)}>
+              <View style={styles.formSection}>
+                <Text style={styles.sectionTitle}>Edit Product</Text>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Product Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Enter product name"
+                    placeholderTextColor={colors.text.secondary}
+                  />
+                  {!!errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Category</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={category}
+                      onValueChange={setCategory}
+                      style={styles.picker}
+                      dropdownIconColor={colors.text.primary}
+                    >
+                      {categories.map((cat) => (
+                        <Picker.Item key={cat} label={cat} value={cat} color={colors.text.primary} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                    <Text style={styles.label}>Price (₹)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={price}
+                      onChangeText={setPrice}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.text.secondary}
+                    />
+                    {!!errors.price && <Text style={styles.errorText}>{errors.price}</Text>}
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                    <Text style={styles.label}>Discount Price (₹)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={discountPrice}
+                      onChangeText={setDiscountPrice}
+                      keyboardType="numeric"
+                      placeholder="Optional"
+                      placeholderTextColor={colors.text.secondary}
+                    />
+                    {!!errors.discountPrice && <Text style={styles.errorText}>{errors.discountPrice}</Text>}
+                  </View>
+                </View>
+
+                <View style={styles.row}>
+                  <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                    <Text style={styles.label}>Quantity</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={quantity}
+                      onChangeText={setQuantity}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      placeholderTextColor={colors.text.secondary}
+                    />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                    <Text style={styles.label}>GST Slab (%)</Text>
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={gstSlab}
+                        onValueChange={setGstSlab}
+                        style={styles.picker}
+                        dropdownIconColor={colors.text.primary}
+                      >
+                        {GST_SLABS.map((slab) => (
+                          <Picker.Item key={slab} label={`${slab}%`} value={slab} color={colors.text.primary} />
+                        ))}
+                      </Picker>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Description</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={details}
+                    onChangeText={setDetails}
+                    multiline
+                    numberOfLines={4}
+                    placeholder="Enter product details..."
+                    placeholderTextColor={colors.text.secondary}
+                  />
+                </View>
+
+                <TouchableOpacity onPress={pickImage} style={styles.imagePickerButton}>
+                  <Icon name="add-photo-alternate" size={24} color={colors.primary} />
+                  <Text style={styles.imagePickerText}>Change Image</Text>
+                </TouchableOpacity>
+
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={handleSave} style={styles.saveButton} disabled={isSaving}>
+                    {isSaving ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Save Changes</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Animated.View>
+          ) : (
+            // View Mode
+            <>
+              <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.priceSection}>
+                <View>
+                  <Text style={styles.priceLabel}>Final Price</Text>
+                  <Text style={styles.finalPrice}>₹{priceCalculation.finalPrice.toFixed(2)}</Text>
+                  {product.discountPrice && (
+                    <Text style={styles.originalPrice}>₹{product.price.toFixed(2)}</Text>
+                  )}
+                </View>
+                <View style={styles.gstInfo}>
+                  <Text style={styles.gstLabel}>GST ({product.gstSlab}%)</Text>
+                  <Text style={styles.gstAmount}>+₹{priceCalculation.gstAmount.toFixed(2)}</Text>
+                </View>
+              </Animated.View>
+
+              <Animated.View entering={FadeInDown.delay(500).duration(600)} style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Icon name="inventory" size={24} color={colors.primary} />
+                  <Text style={styles.statValue}>{product.quantity || 0}</Text>
+                  <Text style={styles.statLabel}>In Stock</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Icon name="category" size={24} color={colors.secondary} />
+                  <Text style={styles.statValue} numberOfLines={1}>{product.category}</Text>
+                  <Text style={styles.statLabel}>Category</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Icon name="update" size={24} color={colors.text.secondary} />
+                  <Text style={styles.statValue}>
+                    {new Date(product.updatedAt || Date.now()).toLocaleDateString()}
+                  </Text>
+                  <Text style={styles.statLabel}>Updated</Text>
+                </View>
+              </Animated.View>
+
+              {product.details && (
+                <Animated.View entering={FadeInDown.delay(600).duration(600)} style={styles.detailsSection}>
+                  <Text style={styles.sectionTitle}>Description</Text>
+                  <Text style={styles.detailsText}>{product.details}</Text>
+                </Animated.View>
+              )}
+
+              <Animated.View entering={FadeInDown.delay(700).duration(600)} style={styles.actionsSection}>
+                <TouchableOpacity onPress={() => setIsEditing(true)} style={styles.actionButton}>
+                  <Icon name="edit" size={24} color={colors.primary} />
+                  <Text style={styles.actionButtonText}>Edit Details</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleDelete} style={[styles.actionButton, styles.deleteButton]}>
+                  <Icon name="delete" size={24} color={colors.error} />
+                  <Text style={[styles.actionButtonText, { color: colors.error }]}>Delete Product</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </>
+          )}
+        </View>
+      </Animated.ScrollView>
+
+      {/* Image Modal */}
+      <Modal visible={imageModalVisible} transparent={true} onRequestClose={() => setImageModalVisible(false)}>
+        <View style={styles.modalContainer}>
+          <TouchableOpacity style={styles.modalClose} onPress={() => setImageModalVisible(false)}>
+            <Icon name="close" size={30} color="#FFF" />
           </TouchableOpacity>
+          <Image
+            source={imageUri ? { uri: imageUri } : require('../assets/placeholder.png')}
+            style={styles.modalImage}
+            resizeMode="contain"
+          />
         </View>
       </Modal>
-    </Animated.ScrollView>
+    </View>
   );
 };
+
+const getStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  collapsedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: COLLAPSED_HEADER_HEIGHT,
+    backgroundColor: colors.primary,
+    zIndex: 100,
+    elevation: 4,
+    justifyContent: 'flex-end',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text.inverse,
+    flex: 1,
+    marginLeft: 16,
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerAction: {
+    padding: 4,
+    marginLeft: 16,
+  },
+  floatingBackButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    left: 16,
+    zIndex: 90,
+  },
+  roundButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  imageContainer: {
+    height: HEADER_HEIGHT,
+    width: WINDOW_WIDTH,
+    justifyContent: 'flex-end',
+  },
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: WINDOW_WIDTH,
+    height: HEADER_HEIGHT,
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundImage: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.8))',
+  },
+  heroContent: {
+    padding: 20,
+    paddingBottom: 30,
+  },
+  heroCategory: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  heroTitle: {
+    color: '#FFF',
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  badgeText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -20,
+    padding: 20,
+    minHeight: WINDOW_HEIGHT - HEADER_HEIGHT + 20,
+  },
+  priceSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+    padding: 20,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginBottom: 4,
+  },
+  finalPrice: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  originalPrice: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    textDecorationLine: 'line-through',
+    marginTop: 4,
+  },
+  gstInfo: {
+    alignItems: 'flex-end',
+  },
+  gstLabel: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginBottom: 4,
+  },
+  gstAmount: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    marginBottom: 24,
+    gap: 12,
+  },
+  statItem: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    marginTop: 8,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+  },
+  detailsSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    marginBottom: 12,
+  },
+  detailsText: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    lineHeight: 24,
+  },
+  actionsSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  deleteButton: {
+    borderColor: colors.error,
+    backgroundColor: 'rgba(255, 0, 0, 0.05)',
+  },
+  formSection: {
+    paddingBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  pickerContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  picker: {
+    color: colors.text.primary,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    marginBottom: 24,
+    gap: 8,
+  },
+  imagePickerText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: colors.text.inverse,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalClose: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1,
+    padding: 10,
+  },
+  modalImage: {
+    width: '100%',
+    height: '80%',
+  },
+});
 
 export default ProductDetailScreen;
