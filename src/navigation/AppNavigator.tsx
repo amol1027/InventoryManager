@@ -1,13 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { getHeaderTitle } from '@react-navigation/elements';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../theme/ThemeContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { ErrorHandler } from '../utils/ErrorHandler';
-import { ConfirmationDialog } from '../utils/ConfirmationDialog';
 
 // Import screens
 import DashboardScreen from '../screens/DashboardScreen';
@@ -17,9 +12,6 @@ import SettingsScreen from '../screens/SettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import CategoryProductsScreen from '../screens/CategoryProductsScreen';
-
-// Import theme
-import { colors } from '../theme/colors';
 
 // Import custom drawer content
 import CustomDrawerContent from './CustomDrawerContent';
@@ -36,71 +28,11 @@ export type RootStackParamList = {
   Dashboard: undefined;
   AddItem: undefined;
   ProductDetail: { productId: number };
-  CategoryProducts: { categoryName: string };
+  CategoryProducts: { categoryName: string; from?: string };
 };
 
 const Drawer = createDrawerNavigator<RootDrawerParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
-
-// Enhanced error handling for navigation
-const handleNavigationError = (error: Error) => {
-  ErrorHandler.handle(error, 'Navigation', true);
-};
-
-// Enhanced drawer item press handler with error handling
-const handleDrawerItemPress = async (
-  navigation: any,
-  routeName: string,
-  params?: any
-) => {
-  try {
-    if (params) {
-      navigation.navigate(routeName as never, params as never);
-    } else {
-      navigation.navigate(routeName as never);
-    }
-  } catch (error) {
-    handleNavigationError(error as Error);
-  }
-};
-
-// Custom header component with menu button and centered title
-const CustomHeader = ({ navigation, route, options }: { navigation: any; route: any; options: any }) => {
-  const title = getHeaderTitle(options, route.name);
-  
-  return (
-    <View style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.primary,
-      paddingHorizontal: 16,
-      height: 56,
-    }}>
-      <TouchableOpacity 
-        onPress={navigation.toggleDrawer} 
-        style={{
-          position: 'absolute',
-          left: 16,
-          zIndex: 1,
-        }}
-      >
-        <Icon name="menu" size={24} color={colors.text.inverse} />
-      </TouchableOpacity>
-      <View style={{
-        flex: 1,
-        alignItems: 'center',
-      }}>
-        <Text style={{
-          color: colors.text.inverse,
-          fontSize: 20,
-          fontWeight: 'bold',
-        }}>
-          {title}
-        </Text>
-      </View>
-    </View>
-  );
-};
 
 const MainStack = () => {
   const { colors } = useTheme();

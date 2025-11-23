@@ -131,16 +131,16 @@ export class ErrorHandler {
 export class DatabaseErrorHandler {
   static isConnectionError(error: Error): boolean {
     return error.message.includes('database') ||
-           error.message.includes('connection') ||
-           error.message.includes('SQLITE');
+      error.message.includes('connection') ||
+      error.message.includes('SQLITE');
   }
 
   static isConstraintError(error: Error): boolean {
     return error.message.includes('UNIQUE constraint') ||
-           error.message.includes('constraint failed');
+      error.message.includes('constraint failed');
   }
 
-  static createDatabaseError(message: string, originalError?: Error): AppError {
+  static createDatabaseError(message: string, _originalError?: Error): AppError {
     return new AppError(
       message,
       ErrorType.DATABASE,
@@ -157,11 +157,11 @@ export class DatabaseErrorHandler {
 export class NetworkErrorHandler {
   static isNetworkError(error: Error): boolean {
     return error.message.includes('network') ||
-           error.message.includes('fetch') ||
-           error.message.includes('timeout');
+      error.message.includes('fetch') ||
+      error.message.includes('timeout');
   }
 
-  static createNetworkError(message: string, originalError?: Error): AppError {
+  static createNetworkError(message: string, _originalError?: Error): AppError {
     return new AppError(
       message,
       ErrorType.NETWORK,

@@ -134,16 +134,6 @@ class DatabaseService {
         );
         console.log('Added quantity column to products table');
       }
-
-      // Add indices for performance
-      await this.database.executeSql(
-        "CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);"
-      );
-      await this.database.executeSql(
-        "CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);"
-      );
-      console.log('Database indices checked/created');
-
     } catch (error) {
       console.error('Error migrating database:', error);
       throw error;
@@ -227,7 +217,7 @@ class DatabaseService {
     if (!this.database) throw new Error('Database not initialized');
 
     try {
-      const [result] = await this.database.executeSql('SELECT * FROM products ORDER BY updatedAt DESC');
+      const [result] = await this.database.executeSql('SELECT * FROM products');
       const products: Product[] = [];
 
       for (let i = 0; i < result.rows.length; i++) {
@@ -241,40 +231,24 @@ class DatabaseService {
     }
   }
 
-  async getProducts(limit: number = 20, offset: number = 0): Promise<Product[]> {
+  async getProductsByCategory(category: string): Promise<Product[]> {
     if (!this.database) await this.initDatabase();
     if (!this.database) throw new Error('Database not initialized');
 
     try {
       const [result] = await this.database.executeSql(
-        'SELECT * FROM products ORDER BY updatedAt DESC LIMIT ? OFFSET ?',
-        [limit, offset]
+        'SELECT * FROM products WHERE category = ?',
+        [category]
       );
-      const products: Product[] = [];
 
+      const products: Product[] = [];
       for (let i = 0; i < result.rows.length; i++) {
         products.push(result.rows.item(i));
       }
 
       return products;
     } catch (error) {
-      console.error('Error getting products with pagination:', error);
-      throw error;
-    }
-  }
-
-  async getTotalProductCount(): Promise<number> {
-    if (!this.database) await this.initDatabase();
-    if (!this.database) throw new Error('Database not initialized');
-
-    try {
-      const [result] = await this.database.executeSql('SELECT COUNT(*) as count FROM products');
-      if (result.rows.length > 0) {
-        return result.rows.item(0).count;
-      }
-      return 0;
-    } catch (error) {
-      console.error('Error getting total product count:', error);
+      console.error('Error getting products by category:', error);
       throw error;
     }
   }
@@ -286,7 +260,7 @@ class DatabaseService {
     try {
       const searchQuery = `%${query}%`;
       const [result] = await this.database.executeSql(
-        'SELECT * FROM products WHERE name LIKE ? OR category LIKE ? OR details LIKE ? ORDER BY updatedAt DESC',
+        'SELECT * FROM products WHERE name LIKE ? OR category LIKE ? OR details LIKE ?',
         [searchQuery, searchQuery, searchQuery]
       );
 
