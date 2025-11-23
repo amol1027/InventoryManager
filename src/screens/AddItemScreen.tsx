@@ -7,16 +7,14 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 
 import DatabaseService from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
+import MultiImagePicker from '../components/MultiImagePicker';
 
 const GST_SLABS = [0, 5, 12, 18, 28];
 
@@ -66,31 +64,6 @@ const getStyles = (colors: any) => StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
   },
-  imagePicker: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 12,
-  },
-  imagePlaceholder: {
-    alignItems: 'center',
-  },
-  imagePlaceholderText: {
-    marginTop: 8,
-    color: colors.text.secondary,
-    fontSize: 14,
-  },
   submitButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
@@ -128,7 +101,7 @@ const AddItemScreen = () => {
   const [discountPrice, setDiscountPrice] = useState('');
   const [gstSlab, setGstSlab] = useState<number>(GST_SLABS[0]);
   const [details, setDetails] = useState('');
-  const [imageUri, setImageUri] = useState<string | undefined>(undefined);
+  const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({
     name: '',
@@ -226,44 +199,6 @@ const AddItemScreen = () => {
     return isValid;
   };
 
-  const pickImage = () => {
-    Alert.alert(
-      'Select Image Source',
-      'Choose where to get the image from',
-      [
-        {
-          text: 'Camera',
-          onPress: () => {
-            launchCamera({ mediaType: 'photo', includeBase64: false }, (response) => {
-              if (response.didCancel) {
-                console.log('User cancelled camera');
-              } else if (response.errorCode) {
-                Alert.alert('Error', response.errorMessage || 'Something went wrong');
-              } else if (response.assets && response.assets[0].uri) {
-                setImageUri(response.assets[0].uri);
-              }
-            });
-          },
-        },
-        {
-          text: 'Gallery',
-          onPress: () => {
-            launchImageLibrary({ mediaType: 'photo', includeBase64: false }, (response) => {
-              if (response.didCancel) {
-                console.log('User cancelled gallery');
-              } else if (response.errorCode) {
-                Alert.alert('Error', response.errorMessage || 'Something went wrong');
-              } else if (response.assets && response.assets[0].uri) {
-                setImageUri(response.assets[0].uri);
-              }
-            });
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  };
-
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
@@ -271,6 +206,8 @@ const AddItemScreen = () => {
 
     try {
       setLoading(true);
+
+      const primaryImage = images[0];
 
       const productData = {
         name,
@@ -280,7 +217,8 @@ const AddItemScreen = () => {
         discountPrice: discountPrice && discountPrice.trim() ? parseFloat(discountPrice) : undefined,
         gstSlab,
         details: details.trim() || undefined,
-        imageUri,
+        imageUri: primaryImage,
+        images,
       };
 
       await DatabaseService.addProduct(productData);
@@ -290,6 +228,8 @@ const AddItemScreen = () => {
         'Product added successfully',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
+
+      setImages([]);
     } catch (error) {
       console.error('Error adding product:', error);
       Alert.alert('Error', 'Failed to add product. Please try again.');
@@ -402,17 +342,8 @@ const AddItemScreen = () => {
           numberOfLines={4}
         />
 
-        <Text style={styles.label}>Product Image</Text>
-        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <Icon name="add-a-photo" size={40} color={colors.text.secondary} />
-              <Text style={styles.imagePlaceholderText}>Tap to add image</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <Text style={styles.label}>Product Images</Text>
+        <MultiImagePicker images={images} onImagesChange={setImages} />
 
         <TouchableOpacity
           style={styles.submitButton}

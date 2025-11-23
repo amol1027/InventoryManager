@@ -25,7 +25,7 @@ A comprehensive inventory management application built with React Native and SQL
   - 🟡 Low Stock (1-10 units)
   - 🔴 Out of Stock (0 units)
 - **Dynamic Updates**: Product list refreshes automatically when changes are made
-- **Image Support**: Add product images from camera or gallery
+- **Image Support**: Attach up to five photos per product, choose the primary image, and browse them in a swipeable gallery
 - **Detailed Product Information**: Store specifications, descriptions, and metadata
 - **Date Tracking**: Creation and last updated timestamps with proper formatting
 - **Drawer Navigation**: Professional slide-out menu for easy app navigation
@@ -153,6 +153,20 @@ CREATE TABLE products (
   imageUri TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
   updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Product images are stored in a dedicated table that keeps ordering information and the current primary photo:
+
+```sql
+CREATE TABLE product_images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  productId INTEGER NOT NULL,
+  imageUri TEXT NOT NULL,
+  displayOrder INTEGER NOT NULL,
+  isPrimary INTEGER NOT NULL DEFAULT 0,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE
 );
 ```
 

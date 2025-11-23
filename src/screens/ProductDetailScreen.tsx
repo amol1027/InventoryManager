@@ -7,9 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  Image,
   Dimensions,
-  Modal,
   Share,
   StyleSheet,
 } from 'react-native';
@@ -18,7 +16,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 
 import { ErrorHandler, DatabaseErrorHandler } from '../utils/ErrorHandler';
@@ -26,6 +23,8 @@ import { ConfirmationDialog } from '../utils/ConfirmationDialog';
 import DatabaseService, { Product } from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
 import { calculateFinalPrice, formatPrice, calculateDiscountPercentage } from '../utils/PriceCalculator';
+import ImageGallery from '../components/ImageGallery';
+import MultiImagePicker from '../components/MultiImagePicker';
 
 const GST_SLABS = [0, 5, 12, 18, 28];
 
@@ -127,11 +126,6 @@ const styles = StyleSheet.create({
   imageSection: {
     position: 'relative',
     marginBottom: 16,
-  },
-  productImage: {
-    width: Dimensions.get('window').width - 32,
-    height: 280,
-    borderRadius: 16,
   },
   noImageContainer: {
     width: Dimensions.get('window').width - 32,
@@ -361,25 +355,6 @@ const styles = StyleSheet.create({
   picker: {
     height: 54,
   },
-  imagePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 20,
-    gap: 12,
-  },
-  imagePickerText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  imagePreview: {
-    width: Dimensions.get('window').width - 64,
-    height: 200,
-    borderRadius: 12,
-    marginTop: 12,
-  },
   textArea: {
     borderWidth: 1,
     borderRadius: 12,
@@ -387,38 +362,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 120,
     textAlignVertical: 'top',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBackdrop: {
-    flex: 1,
-    width: Dimensions.get('window').width,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    position: 'relative',
-    width: 300,
-    height: 400,
-  },
-  modalImage: {
-    width: 300,
-    height: 400,
-    borderRadius: 16,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   finalPriceContainer: {
     backgroundColor: '#28a74520',
@@ -504,7 +447,6 @@ const ProductDetailScreen = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [imageModalVisible, setImageModalVisible] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
 
   // Form state
@@ -515,7 +457,7 @@ const ProductDetailScreen = () => {
   const [discountPrice, setDiscountPrice] = useState('');
   const [gstSlab, setGstSlab] = useState<number>(GST_SLABS[0]);
   const [details, setDetails] = useState('');
-  const [imageUri, setImageUri] = useState<string | undefined>(undefined);
+  const [images, setImages] = useState<string[]>([]);
   const [errors, setErrors] = useState({
     name: '',
     price: '',
@@ -529,7 +471,13 @@ const ProductDetailScreen = () => {
       const fetchedProduct = await DatabaseService.getProductById(productId);
 
       if (fetchedProduct) {
-        setProduct(fetchedProduct);
+        const resolvedImages = fetchedProduct.images && fetchedProduct.images.length > 0
+          ? fetchedProduct.images
+          : fetchedProduct.imageUri
+            ? [fetchedProduct.imageUri]
+            : [];
+
+        setProduct({ ...fetchedProduct, images: resolvedImages });
         setName(fetchedProduct.name);
         setCategory(fetchedProduct.category);
         setPrice(fetchedProduct.price.toString());
@@ -537,7 +485,7 @@ const ProductDetailScreen = () => {
         setDiscountPrice(fetchedProduct.discountPrice?.toString() || '');
         setGstSlab(fetchedProduct.gstSlab || GST_SLABS[0]);
         setDetails(fetchedProduct.details || '');
-        setImageUri(fetchedProduct.imageUri);
+        setImages(resolvedImages);
       } else {
         Alert.alert('Error', 'Product not found');
         navigation.goBack();
@@ -610,32 +558,6 @@ const ProductDetailScreen = () => {
     return isValid;
   };
 
-  const pickImage = () => {
-    Alert.alert('Select Image Source', 'Choose where to get the image from', [
-      {
-        text: 'Camera',
-        onPress: () => {
-          launchCamera({ mediaType: 'photo', includeBase64: false }, (response) => {
-            if (!response.didCancel && !response.errorCode && response.assets?.[0]?.uri) {
-              setImageUri(response.assets[0].uri);
-            }
-          });
-        },
-      },
-      {
-        text: 'Gallery',
-        onPress: () => {
-          launchImageLibrary({ mediaType: 'photo', includeBase64: false }, (response) => {
-            if (!response.didCancel && !response.errorCode && response.assets?.[0]?.uri) {
-              setImageUri(response.assets[0].uri);
-            }
-          });
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-
   const handleShare = async () => {
     if (!product) return;
 
@@ -655,6 +577,9 @@ const ProductDetailScreen = () => {
 
     try {
       setIsSaving(true);
+      const normalizedImages = images.filter(Boolean);
+      const primaryImage = normalizedImages[0];
+
       const updatedProduct: Product = {
         ...product!,
         id: productId,
@@ -665,7 +590,8 @@ const ProductDetailScreen = () => {
         discountPrice: discountPrice?.trim() ? parseFloat(discountPrice) : undefined,
         gstSlab,
         details: details.trim() || undefined,
-        imageUri,
+        imageUri: primaryImage,
+        images: normalizedImages,
       };
 
       await DatabaseService.updateProduct(updatedProduct);
@@ -689,16 +615,10 @@ const ProductDetailScreen = () => {
       setDiscountPrice(product.discountPrice?.toString() || '');
       setGstSlab(product.gstSlab || GST_SLABS[0]);
       setDetails(product.details || '');
-      setImageUri(product.imageUri);
+      setImages(product.images || (product.imageUri ? [product.imageUri] : []));
       setErrors({ name: '', price: '', discountPrice: '' });
     }
     setIsEditing(false);
-  };
-
-  const handleImageZoom = () => {
-    if (product?.imageUri) {
-      setImageModalVisible(true);
-    }
   };
 
   const handleDelete = () => {
@@ -769,6 +689,14 @@ const ProductDetailScreen = () => {
 
   const discountPercentage = calculateDiscountPercentage(product.price, product.discountPrice || product.price);
   const priceCalculation = calculateFinalPrice(product.price, product.discountPrice, product.gstSlab || 0);
+  const displayImages = product.images && product.images.length > 0
+    ? product.images
+    : product.imageUri
+      ? [product.imageUri]
+      : [];
+  const primaryImageIndex = product.imageUri
+    ? Math.max(displayImages.findIndex((uri) => uri === product.imageUri), 0)
+    : 0;
 
   const stockStatus = !product.quantity || product.quantity === 0
     ? {
@@ -805,17 +733,9 @@ const ProductDetailScreen = () => {
         </View>
 
         <ScrollView contentContainerStyle={styles.formContainer}>
-          <View style={styles.imageSection}>
-            <TouchableOpacity style={[styles.imagePicker, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={pickImage}>
-              {imageUri ? (
-                <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-              ) : (
-                <>
-                  <Icon name="add-a-photo" size={32} color={colors.primary} />
-                  <Text style={[styles.imagePickerText, { color: colors.primary }]}>Change Image</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text.primary }]}>Product Images</Text>
+            <MultiImagePicker images={images} onImagesChange={setImages} />
           </View>
 
           <View style={styles.inputGroup}>
@@ -990,29 +910,23 @@ const ProductDetailScreen = () => {
       >
         {/* Image Section */}
         <View style={styles.imageSection}>
-          <TouchableOpacity onPress={handleImageZoom} activeOpacity={0.9}>
-            {product.imageUri ? (
-              <Image
-                source={{ uri: product.imageUri }}
-                style={styles.productImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={[styles.noImageContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Icon name="image" size={64} color={colors.text.disabled} />
-                <Text style={[styles.noImageText, { color: colors.text.disabled }]}>
-                  No Image Available
-                </Text>
-              </View>
-            )}
-            {product.discountPrice && (
-              <View style={[styles.discountBadge, { backgroundColor: colors.accent }]}>
-                <Text style={[styles.discountText, { color: colors.text.inverse }]}>
-                  {discountPercentage}% OFF
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          {displayImages.length > 0 ? (
+            <ImageGallery images={displayImages} primaryIndex={primaryImageIndex} />
+          ) : (
+            <View style={[styles.noImageContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Icon name="image" size={64} color={colors.text.disabled} />
+              <Text style={[styles.noImageText, { color: colors.text.disabled }]}>
+                No Image Available
+              </Text>
+            </View>
+          )}
+          {product.discountPrice && (
+            <View style={[styles.discountBadge, { backgroundColor: colors.accent }]}>
+              <Text style={[styles.discountText, { color: colors.text.inverse }]}>
+                {discountPercentage}% OFF
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Info Card */}
@@ -1151,37 +1065,6 @@ const ProductDetailScreen = () => {
         </View>
       </Reanimated.ScrollView>
 
-      {/* Image Zoom Modal */}
-      <Modal
-        visible={imageModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setImageModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            onPress={() => setImageModalVisible(false)}
-            activeOpacity={1}
-          >
-            <View style={styles.modalContent}>
-              {product.imageUri && (
-                <Image
-                  source={{ uri: product.imageUri }}
-                  style={styles.modalImage}
-                  resizeMode="contain"
-                />
-              )}
-              <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: colors.surface }]}
-                onPress={() => setImageModalVisible(false)}
-              >
-                <Icon name="close" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </View>
-      </Modal>
     </View>
   );
 };
