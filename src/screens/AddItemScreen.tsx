@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   Alert,
   ActivityIndicator,
   Image,
@@ -14,11 +13,107 @@ import { useNavigation } from '@react-navigation/native';
 import { Picker } from '@react-native-picker/picker';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 
 import DatabaseService from '../database/DatabaseService';
 import { useTheme } from '../theme/ThemeContext';
 
 const GST_SLABS = [0, 5, 12, 18, 28];
+
+const getStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  formContainer: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  input: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pickerContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  picker: {
+    color: colors.text.primary,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  halfWidth: {
+    width: '48%',
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  imagePicker: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  imagePlaceholder: {
+    alignItems: 'center',
+  },
+  imagePlaceholderText: {
+    marginTop: 8,
+    color: colors.text.secondary,
+    fontSize: 14,
+  },
+  submitButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 32,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 12,
+    marginTop: 4,
+  },
+});
 
 const AddItemScreen = () => {
   const navigation = useNavigation();
@@ -47,30 +142,23 @@ const AddItemScreen = () => {
         setLoadingCategories(true);
         await DatabaseService.initDatabase();
 
-        // Try to get categories from the categories table first
         let categoriesList = await DatabaseService.getAllCategories();
 
         if (categoriesList.length === 0) {
-          // If no categories exist, initialize with only "Others" and reload
           await initializeDefaultCategories();
           categoriesList = await DatabaseService.getAllCategories();
         }
 
         const categoryNames = categoriesList.map(cat => cat.name);
-
-        // Sort categories alphabetically
         categoryNames.sort();
-
         setCategories(categoryNames);
 
-        // Set default category if categories exist
         if (categoryNames.length > 0) {
           setCategory(categoryNames[0]);
         }
       } catch (error) {
         console.error('Error loading categories:', error);
         Alert.alert('Error', 'Failed to load categories');
-        // Fallback to only "Others" category if database fails
         setCategories(['Others']);
         setCategory('Others');
       } finally {
@@ -83,14 +171,11 @@ const AddItemScreen = () => {
 
   const initializeDefaultCategories = async () => {
     try {
-      // Check if "Others" category already exists
       const existingCategories = await DatabaseService.getAllCategories();
       const othersExists = existingCategories.some(cat => cat.name.toLowerCase() === 'others');
 
       if (!othersExists) {
-        // Only create the 'Others' category as the single default category
         await DatabaseService.addCategory({ name: 'Others' });
-        console.log('Default "Others" category initialized in AddItemScreen');
       }
     } catch (error) {
       console.error('Error initializing default categories:', error);
@@ -105,13 +190,11 @@ const AddItemScreen = () => {
       discountPrice: '',
     };
 
-    // Validate name
     if (!name.trim()) {
       newErrors.name = 'Product name is required';
       isValid = false;
     }
 
-    // Validate price
     if (!price.trim()) {
       newErrors.price = 'Price is required';
       isValid = false;
@@ -123,22 +206,10 @@ const AddItemScreen = () => {
       }
     }
 
-    // Validate quantity
-    if (!quantity.trim()) {
-      // Quantity is optional, but if provided, validate it
-    } else {
-      const quantityValue = parseInt(quantity, 10);
-      if (isNaN(quantityValue) || quantityValue < 0) {
-        // For now, we'll allow 0 or positive quantities
-        // You can add more specific validation if needed
-      }
-    }
-
-    // Validate discount price if provided
     if (discountPrice.trim()) {
       const discountValue = parseFloat(discountPrice);
       const priceValue = parseFloat(price);
-      
+
       if (isNaN(discountValue)) {
         newErrors.discountPrice = 'Discount price must be a number';
         isValid = false;
@@ -200,7 +271,7 @@ const AddItemScreen = () => {
 
     try {
       setLoading(true);
-      
+
       const productData = {
         name,
         category,
@@ -213,7 +284,7 @@ const AddItemScreen = () => {
       };
 
       await DatabaseService.addProduct(productData);
-      
+
       Alert.alert(
         'Success',
         'Product added successfully',
@@ -228,28 +299,32 @@ const AddItemScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.formContainer}>
+    <View style={styles.container}>
+      <Reanimated.ScrollView
+        contentContainerStyle={styles.formContainer}
+        entering={FadeInDown.duration(600).springify()}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.label}>Product Name *</Text>
         <TextInput
-          style={[styles.input, errors.name ? styles.inputError : null]}
+          style={[styles.input, errors.name ? { borderColor: colors.error } : null]}
           value={name}
           onChangeText={setName}
           placeholder="Enter product name"
+          placeholderTextColor={colors.text.disabled}
         />
         {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
 
-        <Text style={styles.label}>Category *</Text>
+        <Text style={styles.label}>Category</Text>
         <View style={styles.pickerContainer}>
           {loadingCategories ? (
-            <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Loading categories...</Text>
-            </View>
+            <ActivityIndicator size="small" color={colors.primary} style={{ padding: 14 }} />
           ) : (
             <Picker
               selectedValue={category}
               onValueChange={(itemValue) => setCategory(itemValue)}
               style={styles.picker}
+              dropdownIconColor={colors.text.primary}
             >
               {categories.map((cat) => (
                 <Picker.Item key={cat} label={cat} value={cat} />
@@ -258,75 +333,86 @@ const AddItemScreen = () => {
           )}
         </View>
 
-        <Text style={styles.label}>Price (₹) *</Text>
-        <TextInput
-          style={[styles.input, errors.price ? styles.inputError : null]}
-          value={price}
-          onChangeText={setPrice}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
-        />
-        {errors.price ? <Text style={styles.errorText}>{errors.price}</Text> : null}
+        <View style={styles.row}>
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>Price (₹) *</Text>
+            <TextInput
+              style={[styles.input, errors.price ? { borderColor: colors.error } : null]}
+              value={price}
+              onChangeText={setPrice}
+              placeholder="0.00"
+              placeholderTextColor={colors.text.disabled}
+              keyboardType="numeric"
+            />
+            {errors.price ? <Text style={styles.errorText}>{errors.price}</Text> : null}
+          </View>
 
-        <Text style={styles.label}>Quantity</Text>
-        <TextInput
-          style={styles.input}
-          value={quantity}
-          onChangeText={setQuantity}
-          placeholder="0"
-          keyboardType="number-pad"
-        />
-
-        <Text style={styles.label}>Discount Price (₹)</Text>
-        <TextInput
-          style={[styles.input, errors.discountPrice ? styles.inputError : null]}
-          value={discountPrice}
-          onChangeText={setDiscountPrice}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
-        />
-        {errors.discountPrice ? <Text style={styles.errorText}>{errors.discountPrice}</Text> : null}
-
-        <Text style={styles.label}>GST Slab (%)</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={gstSlab}
-            onValueChange={(itemValue) => setGstSlab(itemValue)}
-            style={styles.picker}
-          >
-            {GST_SLABS.map((slab) => (
-              <Picker.Item key={slab} label={`${slab}%`} value={slab} />
-            ))}
-          </Picker>
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>Quantity</Text>
+            <TextInput
+              style={styles.input}
+              value={quantity}
+              onChangeText={setQuantity}
+              placeholder="0"
+              placeholderTextColor={colors.text.disabled}
+              keyboardType="numeric"
+            />
+          </View>
         </View>
 
-        <Text style={styles.label}>Product Image</Text>
-        <TouchableOpacity
-          style={styles.imagePicker}
-          onPress={pickImage}
-        >
-          <Icon name="add-photo-alternate" size={24} color={colors.primary} />
-          <Text style={styles.imagePickerText}>
-            {imageUri ? 'Change Image' : 'Add Product Image'}
-          </Text>
-        </TouchableOpacity>
-        {imageUri && (
-          <Image
-            source={{ uri: imageUri }}
-            style={styles.imagePreview}
-          />
-        )}
+        <View style={styles.row}>
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>Discount Price (₹)</Text>
+            <TextInput
+              style={[styles.input, errors.discountPrice ? { borderColor: colors.error } : null]}
+              value={discountPrice}
+              onChangeText={setDiscountPrice}
+              placeholder="Optional"
+              placeholderTextColor={colors.text.disabled}
+              keyboardType="numeric"
+            />
+            {errors.discountPrice ? <Text style={styles.errorText}>{errors.discountPrice}</Text> : null}
+          </View>
 
-        <Text style={styles.label}>Additional Details</Text>
+          <View style={styles.halfWidth}>
+            <Text style={styles.label}>GST Slab (%)</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={gstSlab}
+                onValueChange={(itemValue) => setGstSlab(itemValue)}
+                style={styles.picker}
+                dropdownIconColor={colors.text.primary}
+              >
+                {GST_SLABS.map((slab) => (
+                  <Picker.Item key={slab} label={`${slab}%`} value={slab} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        </View>
+
+        <Text style={styles.label}>Description</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={details}
           onChangeText={setDetails}
-          placeholder="Enter product details, specifications, etc."
+          placeholder="Enter product details..."
+          placeholderTextColor={colors.text.disabled}
           multiline
           numberOfLines={4}
-          textAlignVertical="top"
         />
+
+        <Text style={styles.label}>Product Image</Text>
+        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Icon name="add-a-photo" size={40} color={colors.text.secondary} />
+              <Text style={styles.imagePlaceholderText}>Tap to add image</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.submitButton}
@@ -334,110 +420,14 @@ const AddItemScreen = () => {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator size="small" color={colors.text.inverse} />
+            <ActivityIndicator color="#fff" />
           ) : (
-            <>
-              <Icon name="add-circle-outline" size={20} color={colors.text.inverse} />
-              <Text style={styles.submitButtonText}>Add Product</Text>
-            </>
+            <Text style={styles.submitButtonText}>Add Product</Text>
           )}
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </Reanimated.ScrollView>
+    </View>
   );
 };
-
-const getStyles = (colors: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  formContainer: {
-    padding: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.primary,
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  inputError: {
-    borderColor: colors.error,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
-    marginTop: 4,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 50,
-    width: '100%',
-  },
-  imagePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  imagePickerText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  imagePreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  textArea: {
-    minHeight: 100,
-  },
-  submitButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 40,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  submitButtonText: {
-    color: colors.text.inverse,
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  loadingContainer: {
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: colors.text.secondary,
-    fontSize: 16,
-  },
-});
 
 export default AddItemScreen;

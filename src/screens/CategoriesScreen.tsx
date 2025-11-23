@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,24 @@ import {
   Alert,
   TextInput,
   Modal,
+  Platform,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Reanimated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { RootDrawerParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../theme/ThemeContext';
 import DatabaseService, { Category } from '../database/DatabaseService';
 import { ErrorHandler, DatabaseErrorHandler } from '../utils/ErrorHandler';
 import { ConfirmationDialog } from '../utils/ConfirmationDialog';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface CategoryWithCount extends Category {
   count: number;
@@ -35,70 +44,11 @@ const CategoriesScreen = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // Configure native header
-  useLayoutEffect(() => {
-    (navigation as any).setOptions({
-      title: 'Categories',
-      headerLeft: () => (
-        <TouchableOpacity
-          onPress={() => {
-            try {
-              // Try multiple methods to access drawer
-              const parent = (navigation as any).getParent?.();
-              if (parent?.dispatch) {
-                parent.dispatch(DrawerActions.toggleDrawer());
-              } else if ((navigation as any).dispatch) {
-                (navigation as any).dispatch(DrawerActions.toggleDrawer());
-              } else {
-                // Fallback: try to access drawer through root navigation
-                const root = (navigation as any).getRootState?.();
-                if (root?.routes?.[0]?.state) {
-                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
-                }
-              }
-            } catch (error) {
-              console.error('Error toggling drawer:', error);
-            }
-          }}
-          style={{ paddingHorizontal: 8 }}
-        >
-          <Icon name="menu" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      ),
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={() => setModalVisible(true)}
-          style={{ paddingHorizontal: 8 }}
-        >
-          <Icon name="add" size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, colors.text.inverse]);
-
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredCategories(categories);
-    } else {
-      const filtered = categories.filter(category =>
-        category.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredCategories(filtered);
-    }
-  }, [searchQuery, categories]);
-
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
       await DatabaseService.initDatabase();
-
-      // Initialize with default categories if none exist
       await initializeDefaultCategories();
-
       const categoriesWithCount = await DatabaseService.getCategoriesWithProductCount();
       setCategories(categoriesWithCount);
       setFilteredCategories(categoriesWithCount);
@@ -110,16 +60,81 @@ const CategoriesScreen = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  // Configure native header
+  useLayoutEffect(() => {
+    (navigation as any).setOptions({
+      title: 'Categories',
+      headerStyle: {
+        backgroundColor: colors.surface,
+      },
+      headerTintColor: colors.text.primary,
+      headerTitleStyle: {
+        fontWeight: '700',
+        fontSize: 20,
+      },
+      headerShadowVisible: false,
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => {
+            try {
+              const parent = (navigation as any).getParent?.();
+              if (parent?.dispatch) {
+                parent.dispatch(DrawerActions.toggleDrawer());
+              } else if ((navigation as any).dispatch) {
+                (navigation as any).dispatch(DrawerActions.toggleDrawer());
+              } else {
+                const root = (navigation as any).getRootState?.();
+                if (root?.routes?.[0]?.state) {
+                  (navigation as any).dispatch(DrawerActions.toggleDrawer());
+                }
+              }
+            } catch (error) {
+              console.error('Error toggling drawer:', error);
+            }
+          }}
+          style={{ paddingHorizontal: 16 }}
+        >
+          <Icon name="menu" size={24} color={colors.text.primary} />
+        </TouchableOpacity>
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setModalVisible(true)}
+          style={{ paddingHorizontal: 16 }}
+        >
+          <View style={[styles.addButtonHeader, { backgroundColor: colors.primary }]}>
+            <Icon name="add" size={20} color={colors.text.inverse} />
+          </View>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, colors, styles.addButtonHeader]);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredCategories(categories);
+    } else {
+      const filtered = categories.filter(category =>
+        category.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setFilteredCategories(filtered);
+    }
+  }, [searchQuery, categories]);
+
+
 
   const initializeDefaultCategories = async () => {
     try {
       const existingCategories = await DatabaseService.getAllCategories();
-
       if (existingCategories.length === 0) {
-        // Only create the 'Others' category as the single default category
         await DatabaseService.addCategory({ name: 'Others' });
-        console.log('Default "Others" category initialized');
       }
     } catch (error) {
       console.error('Error initializing default categories:', error);
@@ -134,21 +149,16 @@ const CategoriesScreen = () => {
 
     const trimmedCategory = newCategoryName.trim();
 
-    // Check if category already exists (check against current categories)
     if (categories.some(cat => cat.name.toLowerCase() === trimmedCategory.toLowerCase())) {
       Alert.alert('Error', 'Category already exists');
       return;
     }
 
     try {
-      // Add category to database
       await DatabaseService.addCategory({ name: trimmedCategory });
-
-      // Refresh categories from database
       const updatedCategories = await DatabaseService.getCategoriesWithProductCount();
       setCategories(updatedCategories);
       setFilteredCategories(updatedCategories);
-
       setModalVisible(false);
       setNewCategoryName('');
       Alert.alert('Success', `Category "${trimmedCategory}" added successfully`);
@@ -161,50 +171,37 @@ const CategoriesScreen = () => {
   };
 
   const ensureOthersCategoryExists = async (): Promise<number> => {
-    // Check if 'Others' category exists
     const allCategories = await DatabaseService.getAllCategories();
     const othersCategory = allCategories.find((cat: { name: string; }) => cat.name.toLowerCase() === 'others');
-    
+
     if (othersCategory) {
       return othersCategory.id!;
     }
-    
-    // Create 'Others' category if it doesn't exist
+
     const newCategoryId = await DatabaseService.addCategory({ name: 'Others' });
     return newCategoryId;
   };
 
   const handleDeleteCategory = (category: CategoryWithCount) => {
     if (category.count > 0) {
-      // If category has products, ask if user wants to move them to 'Others' category
       Alert.alert(
         'Category Contains Products',
         `"${category.name}" contains ${category.count} product(s). Move these products to 'Others' category and delete?`,
         [
-          { 
-            text: 'Cancel', 
-            style: 'cancel' 
-          },
-          { 
+          { text: 'Cancel', style: 'cancel' },
+          {
             text: 'Move & Delete',
             onPress: async () => {
               try {
-                const othersCategoryId = await ensureOthersCategoryExists();
-                
-                // Move all products to 'Others' category
+                await ensureOthersCategoryExists();
                 await DatabaseService.executeSql(
                   'UPDATE products SET category = ? WHERE category = ?',
                   ['Others', category.name]
                 );
-                
-                // Now delete the category
                 await DatabaseService.deleteCategory(category.id!);
-                
-                // Refresh the categories list
                 const updatedCategories = await DatabaseService.getCategoriesWithProductCount();
                 setCategories(updatedCategories);
                 setFilteredCategories(updatedCategories);
-                
                 Alert.alert('Success', `Moved ${category.count} product(s) to 'Others' and deleted category.`);
               } catch (error) {
                 ErrorHandler.handle(
@@ -212,14 +209,13 @@ const CategoriesScreen = () => {
                   'CategoriesScreen.handleDeleteCategory'
                 );
               }
-            } 
+            }
           }
         ]
       );
       return;
     }
 
-    // If category is empty, proceed with direct deletion
     ConfirmationDialog.show(
       {
         title: 'Delete Category',
@@ -243,19 +239,21 @@ const CategoriesScreen = () => {
     );
   };
 
-  const renderCategoryItem = ({ item }: { item: CategoryWithCount }) => (
-    <View style={styles.categoryItem}>
+  const renderCategoryItem = ({ item, index }: { item: CategoryWithCount, index: number }) => (
+    <Reanimated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+      layout={Layout.springify()}
+      style={styles.categoryItem}
+    >
       <TouchableOpacity
         style={styles.categoryContent}
         onPress={() => {
           try {
-            console.log('Navigating to CategoryProducts with category:', item.name);
-            // Close drawer first, then navigate to MainStack, then to CategoryProducts
             navigation.closeDrawer();
             setTimeout(() => {
               (navigation as any).navigate('MainStack', {
                 screen: 'CategoryProducts',
-                params: { categoryName: item.name }
+                params: { categoryName: item.name, from: 'Categories' }
               });
             }, 100);
           } catch (error) {
@@ -263,12 +261,12 @@ const CategoriesScreen = () => {
           }
         }}
       >
+        <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+          <Icon name="category" size={24} color={colors.primary} />
+        </View>
         <View style={styles.categoryInfo}>
           <Text style={styles.categoryName}>{item.name}</Text>
           <Text style={styles.categoryCount}>{item.count} products</Text>
-        </View>
-        <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
-          <Text style={styles.countText}>{item.count}</Text>
         </View>
         <Icon name="chevron-right" size={24} color={colors.text.secondary} />
       </TouchableOpacity>
@@ -277,18 +275,15 @@ const CategoriesScreen = () => {
         onPress={() => handleDeleteCategory(item)}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Icon name="delete" size={22} color={colors.error} />
+        <Icon name="delete" size={20} color={colors.error} />
       </TouchableOpacity>
-    </View>
+    </Reanimated.View>
   );
 
   return (
     <View style={styles.container}>
-      {/* Header handled by native navigation */}
-
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           value={searchQuery}
@@ -296,14 +291,6 @@ const CategoriesScreen = () => {
           placeholder="Search categories..."
           placeholderTextColor={colors.text.disabled}
         />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={() => setSearchQuery('')}
-          >
-            <Icon name="clear" size={20} color={colors.text.secondary} />
-          </TouchableOpacity>
-        )}
       </View>
 
       {loading ? (
@@ -334,39 +321,49 @@ const CategoriesScreen = () => {
 
       {/* Add Category Modal */}
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Category</Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>Add New Category</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Icon name="close" size={24} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                color: colors.text.primary
+              }]}
               value={newCategoryName}
               onChangeText={setNewCategoryName}
               placeholder="Enter category name"
+              placeholderTextColor={colors.text.disabled}
               autoCapitalize="words"
             />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: colors.background }]}
                 onPress={() => {
                   setModalVisible(false);
                   setNewCategoryName('');
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { color: colors.text.primary }]}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.addButtonModal]}
+                style={[styles.modalButton, styles.addButtonModal, { backgroundColor: colors.primary }]}
                 onPress={handleAddCategory}
               >
-                <Text style={styles.addButtonText}>Add</Text>
+                <Text style={[styles.addButtonText, { color: colors.text.inverse }]}>Add Category</Text>
               </TouchableOpacity>
             </View>
 
@@ -382,48 +379,36 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  addButtonHeader: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-  },
-  addButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
   },
   searchContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    padding: 16,
     backgroundColor: colors.surface,
-    margin: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchIcon: {
-    marginRight: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    zIndex: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     color: colors.text.primary,
-    paddingVertical: 4,
-  },
-  clearButton: {
-    padding: 4,
-    marginLeft: 8,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   noResultsContainer: {
     flex: 1,
@@ -454,16 +439,20 @@ const getStyles = (colors: any) => StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+    paddingTop: 16,
   },
   categoryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginVertical: 4,
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
     overflow: 'hidden',
   },
   categoryContent: {
@@ -472,8 +461,17 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
   deleteButton: {
     padding: 16,
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     borderLeftWidth: 1,
@@ -483,26 +481,14 @@ const getStyles = (colors: any) => StyleSheet.create({
     flex: 1,
   },
   categoryName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: colors.text.primary,
+    marginBottom: 4,
   },
   categoryCount: {
     fontSize: 14,
     color: colors.text.secondary,
-    marginTop: 4,
-  },
-  countBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    minWidth: 32,
-    alignItems: 'center',
-  },
-  countText: {
-    color: colors.text.inverse,
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
@@ -511,57 +497,58 @@ const getStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     width: '90%',
     maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 20,
-    textAlign: 'center',
   },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
-    color: colors.text.primary,
-    backgroundColor: colors.surface,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    gap: 12,
   },
   modalButton: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 5,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: colors.text.secondary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   cancelButtonText: {
-    color: colors.text.inverse,
-    textAlign: 'center',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   addButtonModal: {
-    backgroundColor: colors.primary,
+    elevation: 2,
   },
   addButtonText: {
-    color: colors.text.inverse,
-    textAlign: 'center',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 

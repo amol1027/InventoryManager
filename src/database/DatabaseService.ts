@@ -38,7 +38,7 @@ class DatabaseService {
         name: 'inventoryManager.db',
         location: 'default',
       });
-      
+
       await this.createTables();
       await this.migrateDatabase();
       this.initialized = true;
@@ -100,7 +100,7 @@ class DatabaseService {
       let hasImageUri = false;
       let hasGstSlab = false;
       let hasQuantity = false;
-      
+
       for (let i = 0; i < result.rows.length; i++) {
         const column = result.rows.item(i);
         if (column.name === 'imageUri') {
@@ -227,6 +227,28 @@ class DatabaseService {
       return products;
     } catch (error) {
       console.error('Error getting all products:', error);
+      throw error;
+    }
+  }
+
+  async getProductsByCategory(category: string): Promise<Product[]> {
+    if (!this.database) await this.initDatabase();
+    if (!this.database) throw new Error('Database not initialized');
+
+    try {
+      const [result] = await this.database.executeSql(
+        'SELECT * FROM products WHERE category = ?',
+        [category]
+      );
+
+      const products: Product[] = [];
+      for (let i = 0; i < result.rows.length; i++) {
+        products.push(result.rows.item(i));
+      }
+
+      return products;
+    } catch (error) {
+      console.error('Error getting products by category:', error);
       throw error;
     }
   }

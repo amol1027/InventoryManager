@@ -1,73 +1,85 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { Product } from '../database/DatabaseService';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface ProductCardProps {
   product: Product;
   onPress: (product: Product) => void;
+  index?: number;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onPress }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, onPress, index = 0 }) => {
+  const { colors } = useTheme();
   const hasDiscount = product.discountPrice !== undefined && product.discountPrice < product.price;
   const discountPercentage = hasDiscount
     ? Math.round(((product.price - (product.discountPrice || 0)) / product.price) * 100)
     : 0;
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => onPress(product)}
-      activeOpacity={0.7}
+    <Animated.View
+      entering={FadeInDown.delay(index * 50).springify()}
+      layout={Layout.springify()}
     >
-      <View style={styles.cardContent}>
-        <View style={styles.header}>
-          <Text style={styles.title} numberOfLines={2}>
-            {product.name}
-          </Text>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{product.category}</Text>
+      <TouchableOpacity
+        style={[styles.card, {
+          backgroundColor: colors.surface,
+          shadowColor: colors.shadow,
+          borderColor: colors.border,
+        }]}
+        onPress={() => onPress(product)}
+        activeOpacity={0.9}
+      >
+        <View style={styles.cardContent}>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text.primary }]} numberOfLines={2}>
+              {product.name}
+            </Text>
+            <View style={[styles.categoryBadge, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.categoryText, { color: colors.text.inverse }]}>{product.category}</Text>
+            </View>
+          </View>
+
+          <View style={styles.priceContainer}>
+            {hasDiscount ? (
+              <>
+                <Text style={[styles.originalPrice, { color: colors.text.secondary }]}>${product.price.toFixed(2)}</Text>
+                <Text style={[styles.discountPrice, { color: colors.accent }]}>${product.discountPrice?.toFixed(2)}</Text>
+                <View style={[styles.discountBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={[styles.discountText, { color: colors.text.inverse }]}>{discountPercentage}% OFF</Text>
+                </View>
+              </>
+            ) : (
+              <Text style={[styles.price, { color: colors.text.primary }]}>${product.price.toFixed(2)}</Text>
+            )}
+          </View>
+
+          <View style={[styles.footer, { borderTopColor: colors.divider }]}>
+            <Text style={[styles.detailsLabel, { color: colors.text.secondary }]}>
+              {product.details ? 'Has details' : 'No details'}
+            </Text>
+            <View style={[styles.actionIcon, { backgroundColor: colors.background }]}>
+              <Icon name="chevron-right" size={20} color={colors.primary} />
+            </View>
           </View>
         </View>
-
-        <View style={styles.priceContainer}>
-          {hasDiscount ? (
-            <>
-              <Text style={styles.originalPrice}>${product.price.toFixed(2)}</Text>
-              <Text style={styles.discountPrice}>${product.discountPrice?.toFixed(2)}</Text>
-              <View style={styles.discountBadge}>
-                <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
-              </View>
-            </>
-          ) : (
-            <Text style={styles.price}>${product.price.toFixed(2)}</Text>
-          )}
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.detailsLabel}>
-            {product.details ? 'Has details' : 'No details'}
-          </Text>
-          <Icon name="chevron-right" size={20} color={colors.text.secondary} />
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
+    borderRadius: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 12,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: colors.border,
+    overflow: 'hidden',
   },
   cardContent: {
     padding: 16,
@@ -79,65 +91,68 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+    fontSize: 17,
+    fontWeight: '700',
     flex: 1,
     marginRight: 8,
+    letterSpacing: -0.3,
   },
   categoryBadge: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 16,
+    borderRadius: 12,
   },
   categoryText: {
-    color: colors.text.inverse,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   price: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   originalPrice: {
-    fontSize: 14,
-    color: colors.text.secondary,
+    fontSize: 15,
     textDecorationLine: 'line-through',
     marginRight: 8,
   },
   discountPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.accent,
+    fontSize: 20,
+    fontWeight: '800',
     marginRight: 8,
+    letterSpacing: -0.5,
   },
   discountBadge: {
-    backgroundColor: colors.accent,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   discountText: {
-    color: colors.text.inverse,
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '800',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
   detailsLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  actionIcon: {
+    borderRadius: 20,
+    padding: 4,
   },
 });
 
